@@ -1,0 +1,873 @@
+# Vector layers {#vector-layers}
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(fig.align = 'center', collapse = TRUE, R.options = list(width = 80))
+```
+
+## Contents
+
+* Data structures for vector layers
+* Creating layers from scratch
+* Extracting layer components
+* Creating point layer from table
+* Subsetting based on attributes
+* Input and output
+* Reprojection
+
+## Aims
+
+* Become familiar with data structures for vector layers: points, lines and polygons
+* Examine spatial and non-spatial properties of vector layers
+* Create subsets of vector layers based on their attributes
+* Learn to transform a layer from one Coordinate Reference System (CRS) to another
+
+## Vector layers
+
+### What is a vector layer?
+
+```{r, echo=FALSE, fig.cap="Geometry (left) and attributes (right) of vector layers", out.width="70%"}
+knitr::include_graphics("images/vector_layers.png")
+```
+
+https://www.neonscience.org/dc-shapefile-attributes-r
+
+### Vector file formats
+
+* Binary
+    * **ESRI Shapefile** (`.shp`, `.shx`, `.dbf`, `.prj`, ...)
+    * **GeoPackage (GPKG)** (`.gpkg`)
+* Plain Text
+    * **GeoJSON** (`.json` or `.geojson`)
+    * **GPS Exchange Format (GPX)** (`.gpx`)
+    * **Keyhole Markup Language (KML)** (`.kml`)
+* Spatial Databases
+    * **PostGIS / PostgreSQL**
+
+### Vector data structures (`sp`)
+
+```{r, echo=FALSE, fig.cap="Pebesma & Bivand, 2005, R News", out.width="100%"}
+knitr::include_graphics("images/lesson_07_paper2.png")
+```
+
+https://journal.r-project.org/archive/r-news.html
+
+```{r, echo=FALSE, fig.cap="The network structure of CRAN; `sp` ecosystem shown in green", out.width="100%"}
+knitr::include_graphics("images/cran_graph.png")
+```
+
+blog.revolutionanalytics.com/2015/07/the-network-structure-of-cran.html
+
+* Package `sp` has **6 main classes** for vector layers
+    * One for each **geometry type** (points, lines, polygons)
+    * One for **geometry only** and one for **geometry with attributes**
+
+| class | geometry | attributes |
+|---|---|---|
+| `SpatialPoints` | Points | - | 
+| `SpatialPointsDataFrame` | Points | `data.frame` | 
+| `SpatialLines` | Lines | - |
+| `SpatialLinesDataFrame` | Lines | `data.frame` | 
+| `SpatialPolygons` | Polygons | - |
+| `SpatialPolygonsDataFrame` | Polygons | `data.frame` | 
+
+Table: Spatial data structures in package `sp`
+
+### Vector data structures (`sf`)
+
+```{r, echo=FALSE, fig.cap="Pebesma, 2018, The R Journal", out.width="100%"}
+knitr::include_graphics("images/lesson_07_paper1.png")
+```
+
+https://journal.r-project.org/archive/2018-1/
+
+* Package `sf` defines a **hierarchical class system**
+    * Class `sfg` is for a **single geometry**
+    * Class `sfc` is a **set of geometries** with a CRS
+    * Class `sf` is a **layer with attributes**
+
+| class | hierarchy | data |
+|---|---|---|
+| `sfg` | geometry | coords, type, dimension | 
+| `sfc` | geometry column | set of `sfg` + CRS | 
+| `sf` | layer | `sfc` + attributes | 
+
+Table: Spatial data structures in package `sf`
+
+### Vector layers in R: package `sf`
+
+* `sf` is a relative new (2016-) R package for **handling vector layers in R** 
+* In the long-term, `sf` aims to replace `rgdal` (2003-), `sp` (2005-), and `rgeos` (2011-)
+* The main innovation in `sf` is a complete implementation of the **Simple Features** (https://cran.r-project.org/web/packages/sf/vignettes/sf1.html) standard 
+* Since 2003, Simple Features been widely implemented in **spatial databases** (such as **PostGIS**), commercial GIS (e.g., **ESRI ArcGIS**) and forms the vector data basis for libraries such as GDAL
+* When working with spatial databases, Simple Features are commonly specified as (**Well Known Text (WKT)**)[https://en.wikipedia.org/wiki/Well-known_text]
+* A subset of simple features forms the [**GeoJSON**](https://en.wikipedia.org/wiki/GeoJSON) standard
+
+```{r, echo=FALSE, fig.cap="`sf` package dependencies", out.width="100%"}
+knitr::include_graphics("images/sf_deps.png")
+```
+
+https://github.com/edzer/rstudio_conf
+
+* The `sf` class extends the `data.frame` class to include a **geometry** column 
+* This is similar to the way that **spatial databases** are structured
+
+```{r, echo=FALSE, fig.cap="Structure of an `sf` object", out.width="100%"}
+knitr::include_graphics("images/sf.png")
+```
+
+https://cran.r-project.org/web/packages/sf/vignettes/sf1.html
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, out.width="100%", fig.width=8, fig.height=3}
+library(sf)
+
+nc = st_read(system.file("shape/nc.shp", package = "sf"), quiet = TRUE)
+nc = nc[1:3, 9:15]
+opar = par(mar=c(0,0,0,0))
+# plot(nc)
+library(ggplot2)
+nc$id = 1:nrow(nc)
+nc1 = reshape2::melt(st_set_geometry(nc, NULL), id.vars = "id")
+nc1 = merge(nc1, nc, all.x = TRUE)
+nc1 = st_sf(nc1)
+ctr = st_centroid(nc1)
+ctr$x = st_coordinates(ctr)[, 1]
+ctr$y = st_coordinates(ctr)[, 2]
+
+ggplot() +
+  geom_sf(data = nc1) +
+  geom_text(data = ctr, aes(x = x, y = y, label = value)) +
+  facet_wrap(~ variable) +
+  theme_bw() +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    strip.background = element_blank(),
+    panel.border = element_blank(),
+    panel.grid.major = element_line(colour = 'transparent')
+  )
+par(opar)
+```
+
+```{r, echo=FALSE, out.width="80%"}
+knitr::include_graphics("images/sf.png")
+```
+
+* The `sf` class is actually a hierarchical structure composed of three classes - 
+    * `sf` - Vector **layer** object, a table (`data.frame`) with one or more attribute columns and one geometry column
+    * `sfc` - Geometric part of the vector layer, the **geometry column**
+    * `sfg` - **Geometry** of an individual simple feature
+
+```{r, echo=FALSE, out.width="100%"}
+knitr::include_graphics("images/sf.png")
+```
+
+## Vector layers from scratch
+
+* Let's create a sample **object** for each of these classes to learn more about them 
+* Objects of class `sfg`, i.e. a **single geometry**, can be created using the appropriate function for each geometry type - 
+    * `st_point`
+    * `st_multipoint`
+    * `st_linestring`
+    * `st_multilinestring`
+    * `st_polygon`
+    * `st_multipolygon`
+    * `st_geometrycollection`
+* From **coordinates** passed as - 
+    * `numeric` vectors - `POINT`
+    * `matrix` objects - `MULTIPOINT` or `LINESTRING`
+    * `list` objects - All other geometries
+
+### Geometry (`sfg`)
+
+```{r, echo=FALSE, fig.cap="Simple feature geometry (`sfg`) types in package `sf`", fig.width=6.8, fig.height=4, out.width="100%", warning=FALSE}
+point = st_as_sfc("POINT (30 10)")[[1]]
+linestring = st_as_sfc("LINESTRING (30 10, 10 30, 40 40)")[[1]]
+polygon = st_as_sfc("POLYGON ((35 10, 45 45, 15 40, 10 20, 35 10),(20 30, 35 35, 30 20, 20 30))")[[1]]
+multipoint = st_as_sfc("MULTIPOINT ((10 40), (40 30), (20 20), (30 10))")[[1]]
+multilinestring = st_as_sfc("MULTILINESTRING ((10 10, 20 20, 10 40),(40 40, 30 30, 40 20, 30 10))")[[1]]
+multipolygon = st_as_sfc("MULTIPOLYGON (((40 40, 20 45, 45 30, 40 40)),((20 35, 10 30, 10 10, 30 5, 45 20, 20 35),(30 20, 20 15, 20 25, 30 20)))")[[1]]
+geometrycollection = st_as_sfc("GEOMETRYCOLLECTION (POLYGON((30 20, 45 40, 10 40, 30 20)),LINESTRING (10 10, 20 20, 10 30),POINT (40 20))")[[1]]
+pol = st_as_sfc("POLYGON((30 20, 45 40, 10 40, 30 20))")[[1]]
+l = st_as_sfc("LINESTRING (10 10, 20 20, 10 30)")[[1]]
+p = st_as_sfc("POINT (40 20)")[[1]]
+opar = par()
+par(mfrow = c(2, 4), mar = c(1,1,1,1))
+plot(point, main = "POINT", col = "blue", cex = 1.8, lwd = 2)
+plot(linestring, main = "LINESTRING", col = "blue", lwd = 2)
+plot(polygon, main = "POLYGON", border = "blue", col = "#0000FF33", lwd = 2)
+plot(1, type="n", axes=F, xlab="", ylab="")
+plot(multipoint, main = "MULTIPOINT", col = "blue", cex = 1.8, lwd = 2)
+plot(multilinestring, main = "MULTILINESTRING", col = "blue", lwd = 2)
+plot(multipolygon, main = "MULTIPOLYGON", border = "blue", col = "#0000FF33", lwd = 2)
+plot(geometrycollection, main = "GEOMETRYCOLLECTION", col = NA, border = NA, lwd = 2)
+plot(pol, border = "blue", col = "#0000FF33", add = TRUE, lwd = 2)
+plot(l, col = "blue", add = TRUE, lwd = 2)
+plot(p, col = "blue", add = TRUE, cex = 1.8, lwd = 2)
+par(opar)
+```
+
+```{r, echo=FALSE, fig.cap="Intersection between two polygons may yield a `GEOMETRYCOLLECTION`", fig.width=5, fig.height=5, out.width="65%", warning=FALSE}
+opar = par(mfrow = c(2, 1), mar = rep(0.75, 4))
+a = st_polygon(list(cbind(c(0,0,7.5,7.5,0),c(0,-1,-1,0,0))))
+b = st_polygon(list(cbind(c(0,1,2,3,4,5,6,7,7,0),c(1,0,0.5,0,0,0.5,-0.5,-0.5,1,1))))
+plot(a, border = "blue", col = "#0000FF33", lwd = 2, ylim = c(-1,1))
+title("Intersecting two polygons")
+plot(b, border = "red", col = "#FF000033", lwd = 2, add = TRUE)
+i = st_intersection(a,b)
+plot(a, border = "#0000FF33", col = "#0000FF33", lwd = 2, ylim = c(-1,1))
+title("GEOMETRYCOLLECTION")
+plot(b, border = "#FF000033", col = "#FF000033", lwd = 2, add = TRUE)
+plot(i, add = TRUE, col = "black", lwd = 4)
+par(opar)
+```
+
+* For example, we can create a **point geometry** object named `pnt1`, representing a `POINT` geometry, using the `st_point` function - 
+
+```{r}
+library(sf)
+
+pnt1 = st_point(c(34.812831, 31.260284))
+```
+
+* Printing the object in the console gives the **WKT** representation -
+
+```{r}
+pnt1
+```
+
+* Note the **class** definition of an `sfg` (geometry) object is actually composed of three parts:
+    * `XY` - The **dimensions** type (`XY`, `XYZ`, `XYM` or `XYZM`)
+    * `POINT` - The **geometry** type (`POINT`, `MULTIPOLYGON`, etc.)
+    * `sfg` - The general **class** (`sfg` = Simple Feature Geometry)
+* For example, the `pnt1` object has geometry `POINT` and dimensions `XY` -
+
+```{r}
+class(pnt1)
+```
+
+* Creating a `POLYGON` with `st_polygon` 
+* Note: we learn about `list` in **Leasson 10**
+
+```{r}
+a = st_polygon(
+  list(
+    cbind(
+      c(0,0,7.5,7.5,0),
+      c(0,-1,-1,0,0)
+    )
+  )
+)
+```
+
+```{r}
+a
+```
+
+```{r}
+class(a)
+```
+
+```{r, echo=FALSE, out.width="100%", fig.cap="An `sfg` object of type `POLYGON`"}
+plot(a, border = "blue", col = "#0000FF33", lwd = 2)
+```
+
+* Another `POLYGON` - 
+
+```{r}
+b = st_polygon(
+  list(
+    cbind(
+      c(0,1,2,3,4,5,6,7,7,0),
+      c(1,0,0.5,0,0,0.5,-0.5,-0.5,1,1)
+    )
+  )
+)
+```
+
+```{r}
+b
+```
+
+```{r}
+class(b)
+```
+
+```{r, echo=FALSE, out.width="100%", fig.cap="Another `sfg` object of type `POLYGON`"}
+plot(b, border = "red", col = "#FF000033", lwd = 2)
+```
+
+* The `c` function combines `sfg` geometries:
+
+```{r}
+ab = c(a, b)
+```
+
+```{r}
+ab
+```
+
+```{r}
+class(ab)
+```
+
+* Question: what type of geometry is `c(a, b, pnt1)`?
+
+```{r, echo=FALSE, out.width="100%", fig.cap="An `sfg` object of type `MULTIPOLYGON`"}
+plot(ab, border = "darkgreen", col = "#00FF0033", lwd = 2)
+```
+
+* A new geometry can be calculated applying various functions on an existing one(s) 
+* Note: we learn about `st_intersection` in **Lesson 08**
+
+```{r}
+i = st_intersection(a, b)
+```
+
+```{r}
+i
+```
+
+```{r}
+class(i)
+```
+
+```{r, echo=FALSE, fig.width=7, fig.height=4.75, out.width="100%", fig.cap="An `sfg` object of type `GEOMETRYCOLLECTION`"}
+plot(i, border = "black", col = "darkgrey", lwd = 2)
+```
+
+### Geometry column (`sfc`)
+
+* Let's create a **second** object named `pnt2`, representing a different point -
+
+```{r}
+pnt2 = st_point(c(34.798443, 31.243288))
+```
+
+* Geometry objects (`sfg`) can be **collected** into a geometry column (`sfc`) object 
+* This is done with **function** `st_sfc`
+
+* **Geometry column** objects contain a **Coordinate Reference System** (CRS) definition, specified with the `crs` parameter of function `st_sfc`
+* Two types of CRS definitions are accepted - 
+    * An **EPSG** code (`4326`)
+    * A **PROJ.4** definition (`"+proj=longlat +datum=WGS84"`)
+* Let's combine the two `POINT` geometries `pnt1` and `pnt2` into a geometry column (`sfc`) object named `geom` - 
+
+```{r}
+geom = st_sfc(pnt1, pnt2, crs = 4326)
+```
+
+* Here is a **summary** of the resulting geometry column - 
+
+```{r, eval=FALSE}
+geom
+```
+
+```{r, echo=FALSE, size="scriptsize"}
+geom
+```
+
+### Layer (`sf`)
+
+* A geometry column (`sfc`) can be combined with non-spatial columns, or **attributes**, resulting in a **layer** (`sf`) object
+* In our case the two points in the `sfc` geometry column `geom` represent the location of the two **railway stations** in Beer-Sheva
+* Let's create a `data.frame` with -
+    * A `town` column specifying **town name**
+    * A `station` column specifying **station name**
+* Note: the **order** of attributes must match the order of the geometries!
+
+* Creating the **attribute table** - 
+
+```{r}
+dat = data.frame(
+  town = c("Beer-Sheva", "Beer-Sheva"),
+  station = c("North", "Center"),
+  stringsAsFactors = FALSE
+)
+```
+
+```{r}
+dat
+```
+
+* And combining the **attribute table** with the **geometry column** - 
+
+```{r, eval=FALSE}
+layer = st_sf(dat, geom)
+layer
+```
+
+```{r, include=FALSE}
+layer = st_sf(dat, geom)
+```
+
+```{r, echo=FALSE, size="scriptsize"}
+layer
+```
+
+### Interactive mapping with `mapview`
+
+* Function `mapview` is useful for **inspecting** spatial data - 
+
+```{r}
+library(mapview)
+
+mapview(layer)
+```
+
+## Extracting layer components
+
+* In the last few slides we - 
+    * Started from raw **coordinates**
+    * Convered them to **geometry** objects (`sfg`) 
+    * Combined the geometries to a **geometry column** (`sfc`)
+    * Added attributes to the geometry column to get a **layer** (`sf`)
+    * In short: coordinates → `sfg` → `sfc` → `sf`
+* Sometimes we are interested in the opposite process
+* We may need to extract the simpler components (**geometry**, **attributes**, **coordinates**) from an existing layer
+    * `sf` → `sfg`
+    * `sf` → attributes (`data.frame`)
+    * `sf` → coordinates (`matrix`)
+
+* The **geometry column** (`sfc`) component can be extracted from an `sf` layer object using function `st_geometry` -
+
+```{r, eval=FALSE}
+st_geometry(layer)
+```
+
+```{r, echo=FALSE, size="scriptsize"}
+st_geometry(layer)
+```
+
+* The non-spatial columns of an `sf` layer, i.e. the **attribute table**, can be extracted from an `sf` object using function `st_set_geometry` and `NULL` - 
+
+```{r}
+st_set_geometry(layer, NULL)
+```
+
+```{r, echo=FALSE, fig.cap="Attribute table in ArcGIS", out.width="100%"}
+knitr::include_graphics("images/lesson_05_arcgis_attribute_table.png")
+```
+
+* The **coordinates** (`matrix` object) of `sf`, `sfc` or `sfg` objects can be obtained with function `st_coordinates` - 
+
+```{r}
+st_coordinates(layer)
+```
+
+## Creating point layer from table
+
+* A common way of creating a point layer is to transform a **table** which has **X** and **Y** coordinate **columns**
+* Function `st_as_sf` can **convert** a table (`data.frame`) into a point layer (`sf`)
+* In `st_as_sf` we specify -
+    * `x` - The `data.frame` to be converted
+    * `coords` - Columns names with the coordinates (X, Y)
+    * `crs` - The CRS (`NA` if left unspecified)
+* Let's take the `rainfall.csv` table as an example - 
+
+```{r}
+rainfall = read.csv(
+  "data/rainfall.csv", 
+  stringsAsFactors = FALSE
+)
+```
+
+```{r}
+head(rainfall)
+```
+
+* The table can be converted to an `sf` layer using `st_as_sf` - 
+
+```{r}
+rainfall = st_as_sf(
+  x = rainfall, 
+  coords = c("x_utm", "y_utm"), 
+  crs = 32636
+)
+```
+
+* Note 1: The order of `coords` column names corresponds to X-Y!
+* Note 2: `32636` is the EPSG code of the UTM zone 36N projection (see below)
+
+```{r, echo=FALSE, fig.cap="Displaying XY data from CSV in ArcGIS: step 1", out.width="100%"}
+knitr::include_graphics("images/lesson_05_arcgis_display_xy_data1.png")
+```
+
+```{r, echo=FALSE, fig.cap="Displaying XY data from CSV in ArcGIS: step 2", out.width="100%"}
+knitr::include_graphics("images/lesson_05_arcgis_display_xy_data2.png")
+```
+
+```{r, echo=FALSE, fig.cap="Displaying XY data from CSV in ArcGIS: step 3", out.width="100%"}
+knitr::include_graphics("images/lesson_05_arcgis_display_xy_data3.png")
+```
+
+```{r, eval=FALSE}
+rainfall
+```
+
+```{r, include=FALSE}
+options(width = 250)
+```
+
+```{r, echo=FALSE, size="scriptsize"}
+rainfall
+```
+
+```{r, include=FALSE}
+options(width = 50)
+```
+
+`sf` layer properties:
+
+* Number of **rows** / **features** - 
+
+```{r}
+nrow(rainfall)
+```
+
+* Number of **columns** (including geometry column) - 
+
+```{r}
+ncol(rainfall)
+```
+
+* **Both** - 
+
+```{r}
+dim(rainfall)
+```
+
+* Question 1: what is the result of `st_geometry(rainfall)`?
+* Question 2: and `st_set_geometry(rainfall, NULL)`?
+
+* **Bounding box** coordinates -
+
+```{r}
+st_bbox(rainfall)
+```
+
+* **Coordinate Reference System** (CRS) -
+
+```{r}
+st_crs(rainfall)
+```
+
+Interactive mapping with `mapview`:
+
+```{r}
+mapview(rainfall, zcol = "jan", legend = TRUE)
+```
+
+* Question: what is the difference between the following two plots? (see next slide)
+
+```{r, eval=FALSE}
+plot(st_geometry(rainfall))
+```
+
+```{r, fig.cap="Two plots", out.width="100%"}
+opar = par(mfrow = c(1, 2))
+plot(st_geometry(rainfall))
+plot(
+  st_coordinates(rainfall)[, 1], 
+  st_coordinates(rainfall)[, 2]
+)
+par(opar)
+```
+
+## Subsetting based on attributes
+
+* **Subsetting** (filtering) of features in an `sf` vector layer is exactly the same as filtering rows in a `data.frame`
+* Remember: an `sf` layer *is* a `data.frame`
+* For example, the following expressions filters the `rainfall` layer -
+
+```{r, eval=FALSE}
+plot(st_geometry(
+  rainfall[1:10, ]
+))
+```
+
+```{r, eval=FALSE}
+plot(st_geometry(
+  rainfall[rainfall$jan > 100, ]
+))
+```
+
+* Note that the geometry column **"sticks"** to the subset, by default, even if we do not select it - 
+
+```{r, eval=FALSE}
+rainfall[1:2, c("jan", "feb")]
+```
+
+```{r, echo=FALSE, size="scriptsize"}
+rainfall[1:2, c("jan", "feb")]
+```
+
+* Only when we use `[` with `drop=TRUE`, the geometry column is **"dropped"** and we get - 
+    * A `data.frame` when the subset includes **>1 columns**
+    * A vector when the subset includes a **single column**
+
+```{r}
+rainfall[1:2, c("jan", "feb"), drop = TRUE]
+```
+
+```{r, echo=FALSE, fig.cap="Subsets of the `rainfall` layer", out.width="100%"}
+opar = par(mfrow = c(1, 2))
+plot(st_geometry(rainfall[1:10, ]), main = "rainfall[1:10, ]")
+plot(st_geometry(rainfall[rainfall$jan > 100, ]), main = "rainfall[rainfall$jan > 100, ]")
+par(opar)
+```
+
+## Reading and writing vector layers
+
+### Reading vector layers
+
+* In addition to creating from scratch and transforming a table to point layer, often we want to **read** existing vector layers from a **file** (or from a spatial database)
+* This can be done with the `st_read` function
+* For complete list of **available drivers** see -
+
+```{r, eval=FALSE}
+View(st_drivers(what = "vector"))
+```
+
+* In our next example we will read a **Shapefile**
+* In case the Shapefile is located in the **working directory** we only need to specify the **name** of the `.shp` file
+* We can also specify `stringsAsFactors=FALSE` to avoid conversion of `character` to `factor`
+
+```{r}
+rainfall = st_read(
+  "data/rainfall_pnt.shp", 
+  stringsAsFactors = FALSE
+)
+```
+
+* As another example, let's read a **Shapefile** of **US county** boundaries - 
+
+```{r}
+county = st_read(
+  "data/USA_2_GADM_fips.shp", 
+  stringsAsFactors = FALSE
+)
+```
+
+* And a **GeoJSON** file with the location of **three airports** - 
+
+```{r}
+airports = st_read(
+  "data/airports.geojson", 
+  stringsAsFactors = FALSE
+)
+```
+
+### Writing vector layers
+
+* **Writing** an `sf` object to a **file** can be done with `st_write`
+* Before writing the `rainfall` layer back to disk, let's calculate a new column called `annual` - 
+
+```{r}
+m = c(
+  "sep", "oct", "nov", "dec", "jan",
+  "feb", "mar", "apr", "may"
+)
+rainfall$annual = apply(
+  X = st_set_geometry(rainfall[, m], NULL),
+  MARGIN = 1,
+  FUN = sum
+)
+```
+
+* **Writing** with `st_write` - 
+
+```{r}
+st_write(
+  rainfall, 
+  "data/rainfall_pnt2.shp", 
+  delete_dsn = TRUE
+)
+```
+
+* Note: the format is automatically determined based on the `.shp` file extension
+
+## Basic plotting
+
+```{r}
+head(st_set_geometry(county, NULL))
+```
+
+```{r}
+head(st_set_geometry(airports, NULL))
+```
+
+* When plotting an `sf` object we get **multiple** small maps, one for each attribute 
+* This can be useful to quickly examine the types of spatial variation in our data
+
+```{r, fig.cap="Plot of `sf` object", out.width="100%", warning=FALSE}
+plot(county)
+```
+
+* Plotting a single attribute also shows the **legend**:
+
+```{r, fig.cap="Plot of `sf` object, single attribute with legend", out.width="100%", warning=FALSE}
+plot(county[, "TYPE_2"], key.width = lcm(5), key.pos = 4)
+```
+
+* Plotting an `sfc` or an `sfg` object shows just the **geometry** - 
+
+```{r, fig.cap="Plot of `sfc` object", out.width="100%", warning=FALSE}
+plot(st_geometry(county))
+```
+
+* When we are plotting an `sfc` **geometry column**, the plot only displays the geometric shape
+* We can use basic **graphical parameters** to control the appearance, such as - 
+    * `col` - Fill color
+    * `border` - Outline color
+    * `pch` - Point shape
+    * `cex` - Point size
+
+* For example, to draw county outline in **grey** - 
+
+```{r, fig.cap="Basic plot of `sfc` object", out.width="100%"}
+plot(st_geometry(county), border = "grey")
+```
+
+* **Additional** vector layers can be drawn in an **existing** graphical window with `add=TRUE`
+* For example, the following expressions draw **both** `airports` and `county`
+* Note that the second expression uses `add=TRUE`
+
+```{r, fig.cap="Using `add=TRUE` in `plot`", out.width="100%"}
+plot(st_geometry(county), border = "grey")
+plot(st_geometry(airports), col = "red", add = TRUE)
+```
+
+* We can also use `add=TRUE` to combine `sfc` geometries with **rasters** in the same plot
+* For example, `modis_average.tif` contains average NDVI based on MODIS for Israel - 
+
+```{r}
+library(stars)
+
+modis_avg = read_stars("data/modis_average.tif")
+```
+
+* Plot - 
+
+```{r, fig.width=4.2, fig.height=7, out.width="45%", fig.cap="`sfc` layer on top of a raster"}
+plot(modis_avg, reset = FALSE)
+plot(st_geometry(rainfall), col = "red", add = TRUE)
+```
+
+## Coordinate Reference Systems (CRS)
+
+* A **Coordinate Reference System (CRS)** defines how the coordinates in the data relate to the surface of the Earth
+    * **Geographic** - longitude and latitude, in degrees
+    * **Projected** - implying flat surface, w/ units (e.g. meters)
+
+```{r, include=FALSE}
+county = st_transform(county, 2163) 
+```
+
+```{r, echo=FALSE, fig.cap="US counties in WGS84 and US Atlas projections", fig.height=4, fig.width=9, out.width="100%"}
+opar = par(mfrow = c(1, 2), mar = rep(2.5, 4))
+plot(county %>% st_transform(4326) %>% st_geometry, axes = TRUE, main = "WGS84 (EPSG=4326)", graticule = TRUE)
+plot(county %>% st_geometry %>% st_set_crs(NA), axes = TRUE, main = "US Atlas (EPSG=2163)", graticule = TRUE)
+par(opar)
+```
+
+```{r, include=FALSE}
+county = st_transform(county, 4326) 
+```
+
+## Reprojection
+
+**Reprojection** is an important part of spatial analysis workflow since as we often need to:
+    
+* Transform several layers into the same projection
+* Switch between un-projected and projected data
+
+A vector layer can be *reprojected* with `st_transform`. The `st_transform` function has two important parameters: 
+
+* `x` - The **layer** to be reprojected 
+* `crs` - The **target CRS**
+
+> Question: why don't we need to specify the *origin* CRS?
+
+The CRS can be specified in one of two ways:
+
+* A **PROJ.4** definition (`"+proj=longlat +datum=WGS84"`)
+* An **EPSG** code (`4326`)
+
+```{r, echo=FALSE, fig.cap="Map of the US using different projections^[https://datacarpentry.org/r-raster-vector-geospatial/09-vector-when-data-dont-line-up-crs/index.html]", out.width="100%"}
+knitr::include_graphics("images/lesson_07_projections.jpg")
+```
+
+Where can we find **EPSG codes** and **PROJ.4** definitions?
+
+* The internet, such as http://spatialreference.org
+* The `make_EPSG` function from package `rgdal` in R
+
+During the course we will use just **four** projections: WGS84, UTM 36N, ITM and US National Atlas (Table \@ref(tab:projections-in-book)).
+
+| Projection | Area | Units | EPSG code |
+|---|---|---|---|
+| WGS84 | World | degrees | `4326` |
+| UTM 36N | Israel | m | `32636` |
+| ITM | Israel | m | `2039` |
+| US National Atlas | USA | m | `2163` |
+
+Table: (\#tab:projections-in-book) Projections used in this book
+
+For example, in the following code section we are reprojecting both the `county` and `airports` layers. The target CRS is the US National Atlas Equal Area projection (EPSG=`2163`):
+
+```{r}
+county = st_transform(county, 2163)
+airports = st_transform(airports, 2163)
+```
+
+* Plot - 
+
+```{r, eval=FALSE}
+plot(st_geometry(county), border = "grey")
+plot(st_geometry(airports), col = "red", add = TRUE)
+```
+
+* Airport coordinates in **WGS84** - 
+
+```{r}
+st_coordinates(st_transform(airports, 4326))
+```
+
+* Airport coordinates in **US atlas** - 
+
+```{r}
+st_coordinates(st_transform(airports, 2163))
+```
+
+```{r, echo=FALSE, fig.cap="Reprojected `county` and `airport` layers", out.width="100%"}
+plot(st_geometry(county), border = "grey")
+plot(st_geometry(airports), col = "red", add = TRUE)
+```
+
+> Create a subset of `county` with the counties of New-Mexico, Arizona and Texas only, and plot the result. 
+
+```{r, echo=FALSE, fig.cap="Subset of three states from the `county` layer", out.width="80%"}
+sel = c("New Mexico", "Arizona", "Texas")
+county1 = county[county$NAME_1 %in% sel, ]
+plot(county1)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

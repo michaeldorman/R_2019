@@ -1,0 +1,438 @@
+# Time series and function definitions {#time-series-and-function-definitions}
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(fig.align = 'center', collapse = TRUE, R.options = list(width = 80))
+```
+
+## Aims
+
+* Working with data which represent time (date)
+* Learn how to visualize our data with graphical functions
+* Learn to define custom functions
+
+## Dates
+
+### Date and time classes in R
+
+* In R, there are several special classes for representing **times** and **time-series** (time+data)
+    * **Times**
+        * `Date` 
+        * `POSIXct` 
+        * `POSIXlt`
+    * **Time series** (time+data) 
+        * `ts` 
+        * `zoo` (package `zoo`)
+        * `xts` (package `xts`)
+
+### Working with `Date` objects
+
+The simplest data structure for representing times is `Date`, used to represent **dates** (without time of day). For example, we can get the **current** date as a `Date` object with `Sys.Date`:
+
+```{r}
+x = Sys.Date()
+x
+```
+
+```{r}
+class(x)
+```
+
+* We can convert `character` values in the **standard** date format `YYYY-MM-DD` to `Date`, using `as.Date` -
+
+```{r}
+as.Date("2014-10-20")
+```
+
+* When the `character` values is in a **non-standard** format, we need to specify the format definition with `format`, using the various component symbols 
+* Full list of format symbols in `?strptime`
+
+| Symbol | Meaning |
+|:---:|---|
+| `%d` | day (`"15"`) |
+| `%m` | month, numeric (`"08"`) |
+| `%b` | month, 3-letter (`"Aug"`) |
+| `%B` | month, full (`"August"`) |
+| `%y` | Year, 2-digit (`14`) |
+| `%Y` | Year, 4-digit (`2014`) |
+
+Table: Common `Date` format components
+
+* For example - 
+
+```{r}
+Sys.setlocale("LC_TIME", "C")
+```
+
+```{r, error=TRUE}
+as.Date("07/Aug/12")
+as.Date("07/Aug/12", format = "%d/%b/%y")
+```
+
+```{r, error=TRUE}
+as.Date("2012-August-07")
+as.Date("2012-August-07", format = "%Y-%B-%d")
+```
+
+* The opposite conversion, with `format`, lets us **extract** specific date components out of a `Date` object - 
+
+```{r}
+d = as.Date("1955-11-30")
+d
+```
+
+```{r}
+format(d, "%d")
+```
+
+```{r}
+format(d, "%B")
+```
+
+```{r}
+as.numeric(format(d, "%Y"))
+```
+
+```{r}
+format(d, "%m/%Y")
+```
+
+* `Date` objects act like **numeric** vectors with respect to certain **operations** that make sense on dates
+* **Logical** operators -
+
+```{r}
+Sys.Date() > as.Date("2013-01-01")
+```
+
+* **Subtraction** -
+
+```{r}
+as.Date("2013-01-01") - as.Date("2012-01-01")
+```
+
+```{r}
+as.Date("2014-01-01") - as.Date("2013-01-01")
+```
+
+* Creating **sequences** with the `seq` function - 
+
+```{r}
+seq(
+  from = as.Date("2018-10-14"), 
+  to = as.Date("2019-01-11"), 
+  by = 7
+)
+```
+
+### Time series
+
+* Let's define two `numeric` vectors: **water level** in Lake Kinneret, in **May** and in **November**, in each year during **1991-2011** -
+
+```{r}
+may = c(
+  -211.92,-208.80,-208.84,-209.12,-209.01,-209.60,
+  -210.24,-210.46,-211.76,-211.92,-213.13,-213.18,
+  -209.74,-208.92,-209.73,-210.68,-211.10,-212.18,
+  -213.26,-212.65,-212.37
+)
+nov = c(
+  -212.79,-209.52,-209.72,-210.94,-210.85,-211.40,
+  -212.01,-212.25,-213.00,-213.71,-214.78,-214.34,
+  -210.93,-210.69,-211.64,-212.03,-212.60,-214.23,
+  -214.33,-213.89,-213.68
+)
+```
+
+* Question 1: what is the average water level in May? in November?
+* Question 2: was the water level ever below `-213` (red line) in May? in November?
+* Question 3: in which year or years was the water level below `-213` in May? in November?
+
+* Question 2: was the water level ever below `-213` (red line) in May? in November?
+
+```{r}
+any(may < -213)
+```
+
+```{r}
+any(nov < -213)
+```
+
+* Note: make sure there is a space between `<` and `-`, otherwise the combination is interpreted as an assignment operator `<-`
+
+* Question 3: in which year or years was the water level below `-213` in May? in November?
+
+```{r}
+year = 1991:2011
+year
+```
+
+```{r}
+year[nov < -213]
+```
+
+```{r}
+year[may < -213]
+```
+
+* Note: we created a logical vector `nov < -213` and used it to subset the corresponding `year` vector
+
+A table is more natural for representing such data:
+
+```{r}
+data.frame(year, may, nov)
+```
+
+We will learn about tables in Chapter \@ref(tables-conditionals-and-loops). 
+
+## Graphics
+
+### Generic functions
+
+* Some of the functions we learned about are **generic functions**
+* Generic functions are functions that can accept arguments of different classes. What the function does depends on the class, according to the **method** defined for that class
+* Advantages - 
+    * Easier to remember function names
+    * Possible to run the same code on different types of objects
+* For example, `mean`, `print` and `plot` (below) are examples of generic functions
+* When the `print` function gets a **vector** it prints the values, but when it gets a **raster** `RasterLayer` object its prints a summary of its properties
+
+### Graphical functions
+
+* The **graphical function** `plot`, given a vector, displays its values in a two dimensional plot where - 
+    * Vector **indices** are on the x-axis 
+    * Vector **values** are on the y-axis
+* For example - 
+
+```{r, fig.cap="Plot of the `nov` vector", out.width="100%"}
+plot(nov, type = "b")
+```
+
+* Note: `type="b"` means **both** points and lines; Other useful options include - 
+    * `type="p"` for points
+    * `type="l"` for lines
+    * `type="o"` for overplotted lines and points
+
+* If we pass **two** vectors to `plot`, the first appears on the x-axis and the second - on the y-axis
+* For example, we can put the years of water level measurement on the x-axis as follows - 
+
+```{r, fig.cap="\\texttt{nov} as function of \\texttt{year}", out.width="100%"}
+plot(year, nov, type = "b")
+```
+
+* We can add a **horizontal line** displaying the red line using `abline` with the `h` parameter - 
+
+```{r, eval=FALSE}
+plot(year, nov, type = "b")
+abline(h = -213)
+```
+
+* Note that `abline` draws in an **existing** graphical device, which is initiated with `plot`
+
+```{r, echo=FALSE, fig.cap="Adding a horizontal line with \\texttt{abline}", out.width="100%"}
+plot(year, nov, type = "b")
+abline(h = -213)
+```
+
+* **Additional** "layers" can be added to an existing plot using functions such as `points` and `lines`
+* We can also use **graphical parameters** to specify different style for each layer, such as `col` to determine point / line color
+* In addition, we will set the y-axis **limit** with `ylim` to make sure both time series are within the displayed range
+* `ylim` accepts a vector of length two: the minimum and the maximum -
+
+```{r, fig.cap="Adding a second series with \\texttt{lines}", out.width="100%"}
+plot(year, nov, ylim = range(c(nov, may)), type = "b", col = "red")
+lines(year, may, type = "b", col = "blue")
+abline(h = -213)
+```
+
+* Finally, we can set the axis **labels** using the `xlab` and `ylab` parameters of the `plot` function - 
+
+```{r, fig.cap="Setting axis labels", out.width="100%"}
+plot(
+  year, nov,
+  xlab = "Year",
+  ylab = "Water level (m)",
+  ylim = range(c(nov, may)),
+  type = "b", col = "red"
+)
+lines(year, may, type = "b", col = "blue")
+abline(h = -213)
+```
+
+### Consecutive differences
+
+* The `diff` function can be used to create a vector of **differences** between consecutive elements - 
+
+```{r}
+d_nov = c(NA, diff(nov))
+d_nov
+```
+
+* Note: we add `NA` to match the input vector `nov`
+
+* Now we can find out which year had the biggest water level **increase** or **decrease** - 
+
+```{r}
+year[which.max(d_nov)]
+```
+
+```{r}
+year[which.min(d_nov)]
+```
+
+* Note: `which.min` and `which.max` ignore `NA` values 
+
+## Defining custom functions
+
+* In **Lesson 01** we learned that a function call is an instruction to execute a certain function, as in - 
+
+```{r, eval=FALSE}
+f(arg1, arg2, ...)
+```
+
+* A **function** is an object containing code, which is loaded into the RAM and can be executed with specific parameters
+* So far we met function defined in the **default** R packages (e.g. `seq`)
+* Later on we will use functions from **external** packages (e.g. `left_join`)
+* Now we learn how to define our own **custom** functions
+
+```{r}
+add_five = function(x) {
+  x_plus_five = x + 5
+  return(x_plus_five)
+}
+```
+
+* Function name (`add_five`)
+* Assignment operator (`=`)
+* Function keyword (`function`)
+* Parameter(s) (`(x)`)
+* Brackets (`{`)
+* Code (`x_plus_five = x + 5`)
+* Returned value (`return(x_plus_five)`)
+* Brackets (`}`)
+
+* The idea is that the code inside the function gets **executed** each time the function is called - 
+
+```{r}
+# Function definition
+add_five = function(x) {
+  x_plus_five = x + 5
+  return(x_plus_five)
+}
+```
+
+```{r}
+# Function call, with argument 5
+add_five(5)
+```
+
+```{r}
+# Function call, with argument 7
+add_five(7)
+```
+
+* When we make a function call, the values we pass as function arguments are assigned to **local variables** which the function code can use
+* The local variables are **not accessible** in the global environment - 
+
+```{r, error=TRUE}
+x_plus_five
+```
+
+* Every function **returns** a value
+* We can **assign** the returned value to a variable to keep it in memory for later use - 
+
+```{r}
+result = add_five(3)
+result
+```
+
+* We can **omit** the `return` expression -
+
+```{r, eval=FALSE}
+return(x_plus_five)
+```
+
+* In which case, the returned value is the **last expression** in the function body
+* We can also omit the `{` and `}` parentheses in case the code consists of a **single expression**
+* Therefore we could define the `add_five` function using **shorter** code - 
+
+```{r}
+add_five = function(x) x + 5
+```
+
+* **Default** parameter values can be given in the function definition
+* In case there is a default value, we can **skip** that parameter in function calls - 
+
+```{r, error=TRUE}
+add_five = function(x) x + 5
+add_five()
+```
+
+```{r}
+add_five = function(x = 1) x + 5
+add_five()
+```
+
+* There are **no restrictions** for the classes of objects a function can accept, as long as we did not set such restrictions ourselves
+* However, we get an **error** if one of the expressions in the function code is illegal given the arguments - 
+
+```{r}
+add_five(1:3)
+```
+
+```{r, error=TRUE}
+add_five("one")
+```
+
+* As another example, let's define a function named `first_last` which accepts a vector and returns the **difference** between the **last** and the **first** elements - 
+
+```{r}
+first_last = function(x) {
+  x[length(x)] - x[1]
+}
+```
+
+```{r}
+first_last(1:3)
+```
+
+```{r}
+first_last(nov)
+```
+
+* Question: write a function named `modify` that accepts three arguments - 
+    * `x`
+    * `index`
+    * `value`
+* The function assigns `value` into the element at `index` index of vector `x`
+* The function returns the modified vector `x`
+* For example - 
+
+```{r, include=FALSE}
+modify = function(x, index, value) {
+  x[index] = value
+  return(x)
+}
+```
+
+```{r}
+v = 1:10
+v
+```
+
+```{r}
+modify(x = v, index = 3, value = 99)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

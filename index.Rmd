@@ -1,0 +1,315 @@
+--- 
+title: "Introduction to Spatial Data Programming with R"
+author: "Michael Dorman"
+date: "`r Sys.time()`"
+site: bookdown::bookdown_site
+output: bookdown::gitbook
+documentclass: book
+bibliography: [book.bib, packages.bib]
+biblio-style: apalike
+link-citations: yes
+---
+
+# Preface {-}
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(fig.align = 'center', collapse = TRUE)
+```
+
+## What is R?
+
+**R** is a programming language and environment, originally developed for statistical computing and graphics. As of September 2018 there are >13,000 R **packages** in the official repository [CRAN](https://cran.r-project.org/web/packages/)^[Comprehensive R Archive Network].
+
+Notable advantages of R are that it is a full-featured programming language, yet relatively simple and that it has a huge collection of over 100,000 functions from various areas of interest. 
+    
+```{r lesson-01-r-trend, echo=FALSE, fig.cap="Stack Overflow Trend for the 'r' question tag^[https://insights.stackoverflow.com/trends?tags=r]", out.width="90%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_01_r_trend.png")
+```
+
+```{r, echo=FALSE, fig.cap="IEEE Language Rankings 2018^[http://blog.revolutionanalytics.com/popularity/]", out.width="100%"}
+knitr::include_graphics("images/lesson_01_ieee_rank_2018.png")
+```
+
+```{r, echo=FALSE, fig.cap="Proportion of research papers citing R^[https://www.nature.com/news/programming-tools-adventures-with-r-1.16609]", out.width="50%"}
+knitr::include_graphics("images/lesson_01_rising_tide_of_R.jpg")
+```
+
+A brief overview of the capabilities and packages for several domains of R use, are available in ["task views"](https://cran.r-project.org/web/views/).
+
+```{r, echo=FALSE, fig.cap="CRAN Task Views^[http://www.maths.lancs.ac.uk/~rowlings/R/TaskViews/]", out.width="80%"}
+knitr::include_graphics("images/lesson_01_cran_task_views.png")
+```
+
+## R and analysis of spatial data
+
+Over time, there was an increasing number of contributed packages for handling and analyzing spatial data in R. Today, spatial analysis is a major functionality in R. As of September 2019, there are **194 packages**^[https://cran.r-project.org/web/views/Spatial.html] specifically addressing spatial analysis in R. 
+
+```{r, echo=FALSE, fig.cap="Books on Spatial Data Analysis with R", out.width="100%", auto.pdf=TRUE}
+knitr::include_graphics("images/books.png")
+```
+
+Some important events in the history of spatial analysis support in R are summarized in Table \@ref(tab:r-history). 
+
+| Year | Event |
+|---|--------------|
+| pre-2003 | Variable and incomplete approaches (`MASS`, `spatstat`, `maptools`, `geoR`, `splancs`, `gstat`, ...) |
+| 2003 | Consensus that a package defining standard data structures should be useful; `rgdal` released on CRAN |
+| 2005 | `sp` released on CRAN; `sp` support in `rgdal` |
+| 2008 | Applied Spatial Data Analysis with R, 1st ed. |
+| 2010 | `raster` released on CRAN |
+| 2011 | `rgeos` released on CRAN |
+| 2013 | Applied Spatial Data Analysis with R, 2nd ed. |
+| 2016 | `sf` released on CRAN |
+| 2018 | `stars` released on CRAN |
+| 2019 | *Geocomputation with R*, (https://geocompr.robinlovelace.net/) |
+| 2020(?) | *Spatial Data Science* (https://keen-swartz-3146c4.netlify.com/) |
+
+Table: (\#tab:r-history) Significant events in the history of R-spatial
+
+The question that arises here is: can R be used as a Geographic Information System (GIS), or as a comprehensive toolbox for doing spatial analysis? The answer is definitely *yes*. Moreover, R has some important advantages over traditional approaches, mainly software with graphical user interfaces, like ArcGIS or QGIS. 
+
+* **General** advantages of Command Line Interface (CLI) software
+    * **Automation** - Doing otherwise unfeasible repetitive tasks
+    * **Reproducibility** - Precise control of instructions to the computer
+* **Strengths** of R as a GIS
+    * R capabilities in **data processing** and **visualization**, combined with dedicated **packages for spatial data**
+    * A **single environment** encompassing all analysis aspects - acquiring data, computation, statistics, visualization, Web, etc.
+* Situations when **other tools** are needed
+    * **Interactive editing or georeferencing** (but see [**`mapedit`**](https://cran.r-project.org/package=mapedit))
+    * Unique **GIS algorithms** (3D analysis, label placement, network routing, splitting lines at intersections, etc.)
+    * Data that **cannot fit in RAM** (but R can connect to spatial databases^[https://cran.r-project.org/web/packages/sf/vignettes/sf2.html]
+
+### Input and output of spatial data
+
+* Reading spatial layers from a file into an R data structure, or writing the R data structure into a file, are handled by external libraries -
+    * [**OGR**](http://www.gdal.org/ogr/) is used for reading/writing vector files, with `sf`
+    * [**GDAL**](http://www.gdal.org/) is used for reading/writing raster files, with `raster`
+    * [**PROJ4**](http://trac.osgeo.org/proj/) is used for handling CRS, in both `sf` and `raster`
+    * Working with specialized formats, e.g. **HDF** with `gdalUtils` or **NetCDF** with `ncdf4`
+
+### **`sf`**: Geoprocessing Vector Layers
+
+* [**GEOS**](http://trac.osgeo.org/geos/) is used for geometric operations on **vector layers** with **`sf`** -
+    * **Numeric operators** - Area, Length, Distance...
+    * **Logical operators** - Contains, Within, Within distance, Crosses, Overlaps, Equals, Intersects, Disjoint, Touches...
+    * **Geometry generating operators** - Centroid, Buffer, Intersection, Union, Difference, Convex-Hull, Simplification...
+
+```{r, echo=FALSE, results="hide", message=FALSE, fig.cap="Buffer function", fig.width=7, fig.height=2.3, out.width="100%", warning=FALSE}
+library(sf)
+states = st_read("~/Dropbox/Presentations/p_2018_04_Exposome_Workshop_NYC/data/cb_2015_us_state_5m.shp")
+p = states[states$state == "New York", ]
+p = st_geometry(p)
+p = st_transform(p, 2163)
+
+opar = par(mfrow=c(1,3), mar = c(0, 0, 1, 0))
+plot(p %>% st_buffer(100000), main = "No buffer", border = NA)
+plot(p, add = TRUE)
+plot(p %>% st_buffer(100000), main = "50 km buffer", border = NA)
+plot(p, add = TRUE)
+plot(p %>% st_buffer(50000) %>% st_difference(p), col = "lightgrey", add = TRUE)
+plot(p %>% st_buffer(100000), main = "100 km buffer")
+plot(p, add = TRUE)
+plot(p %>% st_buffer(100000) %>% st_difference(p), col = "lightgrey", add = TRUE)
+par(opar)
+```
+
+### **`raster`**: Geoprocessing Rasters
+
+* Geometric operations on **rasters** can be done with package `raster` -
+    * **Accessing cell values** - As vector, As matrix, Extract to points / lines / polygons, random / regular sampling, Frequency table, Histogram...
+    * **Raster algebra** - Arithmetic (`+`, `-`, ...), Math (`sqrt`, `log10`, ...), logical (`!`, `==`, `>`, ...), summary (`mean`, `max`, ...), Mask, Overlay...
+    * **Changing resolution and extent** - Crop, Mosaic, (Dis)aggregation, Reprojection, Resampling, Shift, Rotation...
+    * **Focal operators** - Distance, Direction, Focal Filter, Slope, Aspect, Flow direction...
+    * **Transformations** - Vector layers <-> Raster...
+
+### **`geosphere`**: Geometric calculations on longitude/latitude
+
+* Package `geosphere` implements **spherical trigonometry** functions for distance- and direction-related calculations on **geographic coordinates (lon-lat)**
+
+```{r, echo=FALSE, results="hide", message=FALSE, fig.cap="Points on Great Circle", fig.width=8, fig.height=4, out.width="100%"}
+library(geosphere)
+opar = par(mar = rep(0, 4))
+data(wrld)
+plot(wrld, type = 'l', asp = 1, col = "grey")
+LA = c(-118.40, 33.95)
+NY = c(-73.78, 40.63)
+gc = greatCircle(LA, NY)
+lines(gc, lwd=2, col='blue')
+gci = gcIntermediate(LA, NY)
+lines(gci, lwd=4, col='green')
+points(rbind(LA, NY), col='red', pch=20, cex=2)
+mp = midPoint(LA, NY)
+points(mp, pch='*', cex=3, col='orange')
+par(opar)
+```
+
+```{r, echo=FALSE, fig.cap="Visualizing Facebook Friends with `geosphere`^[http://paulbutler.org/archives/visualizing-facebook-friends/]", out.width="100%"}
+knitr::include_graphics("images/facebook_map.png")
+```
+
+### **`gstat`**: Geostatistical Modelling
+
+* Univariate and multivariate geostatistics - 
+    * Variogram modelling 
+    * Ordinary and universal point or block (co)kriging
+    * Cross-validation
+
+```{r, echo=FALSE, results="hide", message=FALSE, fig.cap="Predicted Zinc concentration, using Ordinary Kriging", out.width="70%"}
+library(gstat)
+library(automap)
+library(raster)
+
+data(meuse)
+data(meuse.riv)
+coordinates(meuse) = ~ x + y
+data(meuse.grid)
+gridded(meuse.grid) = ~ x + y
+grid = raster(meuse.grid)
+
+f = log(zinc) ~ 1
+v = autofitVariogram(f, meuse)
+g = gstat(formula = log(zinc) ~ 1, model = v$var_model, data = meuse)
+predicted = interpolate(grid, g)
+predicted = mask(predicted, grid)
+
+# opar = par(mar = rep(0, 4))
+plot(predicted)
+polygon(meuse.riv, asp = 1, col = "lightblue")
+plot(meuse, pch = 1, cex = log(meuse$zinc) / 5, add = TRUE)
+# par(opar)
+```
+
+### **`spdep`**: Spatial dependence modelling
+
+* Modelling with spatial weights - 
+    * Building neighbor lists and spatial weights
+    * Tests for spatial autocorrelation for areal data (e.g. Moran's I)
+    * Spatial regression models (e.g. SAR, CAR)
+
+```{r, echo=FALSE, results="hide", message=FALSE, warning=FALSE, fig.cap="Neighbours list based on regions with contiguous boundaries", fig.width=7, fig.height=3.5, out.width="80%"}
+# From help page of 'poly2nb' function
+library(spdep)
+nc = st_read(system.file("shape/nc.shp", package = "sf"))
+nc = as(nc, "Spatial")
+nc$rate = nc$SID79 / nc$BIR79
+nb = poly2nb(nc)
+opar = par(mar = rep(0, 4))
+plot(nc, border = "grey")
+plot(nb, coordinates(nc), add = TRUE, col = "black")
+par(opar)
+```
+
+### **`spatstat`**: Spatial point pattern analysis
+
+* Techniques for statistical analysis of spatial point patterns, such as - 
+    * Kernel density estimation
+    * Detection of clustering using Ripley's K-function 
+    * Spatial logistic regression
+    
+```{r, echo=FALSE, results="hide", message=FALSE, warning=FALSE, fig.cap="Distance map for the Biological Cells point pattern dataset", fig.width=4, fig.height=4, out.width="40%"}
+library(spatstat)
+data(cells)
+U = distmap(cells)
+opar = par(mar = rep(0, 4))
+contour(U, main = "")
+plot(cells, add = TRUE, col = "red", pch = 3)
+par(opar)
+```
+
+### **`osmdata`**: Access to OpenStreetMap data
+
+* Accessing **OpenStreetMap (OSM)** data using the **Overpass API**^[http://wiki.openstreetmap.org/wiki/Overpass_API]
+
+```{r, message=FALSE, warning=FALSE, fig.cap="Beer-Sheva road network", fig.width=7, fig.height=4.5, out.width="100%"}
+library(sf)
+library(osmdata)
+q = opq(bbox = "Beer-Sheva, Israel")
+q = add_osm_feature(q, key = "highway")
+dat = osmdata_sf(q)
+lines = dat$osm_lines
+pol = dat$osm_polygons
+pol = st_cast(pol, "MULTILINESTRING")
+pol = st_cast(pol, "LINESTRING")
+lines = rbind(lines, pol)
+lines = lines[, c("osm_id", "highway")]
+lines = st_transform(lines, 32636)
+plot(lines)
+```
+
+### **`ggplot2`**, **`ggmap`**: Visualization
+
+```{r, echo=FALSE, fig.cap="London cycle hire journeys with `ggplot2`^[http://spatial.ly/2012/02/great-maps-ggplot2/]", out.width="100%"}
+knitr::include_graphics("images/bike_ggplot.png")
+```
+
+```{r, echo=FALSE, fig.cap="Crime density by day with `ggplot2`", out.width="100%"}
+knitr::include_graphics("images/ggmap_small_multiples.png")
+```
+
+http://spatial.ly/2012/02/great-maps-ggplot2/
+
+### **`leaflet`**, **`mapview`**: Web mapping
+
+* Packages `leaflet` and `mapview` provide methods to produce **interactive maps** using the [Leaflet JavaScript library](http://leafletjs.com/)
+
+```{r, echo=FALSE, out.width="30%"}
+knitr::include_graphics("images/leaflet_logo.png")
+```
+
+* Package [`leaflet`](https://rstudio.github.io/leaflet/) gives more low-level control
+* Package [`mapview`](https://r-spatial.github.io/mapview/) is a wrapper around `leaflet`, automating addition of useful features - 
+    * Commonly used **basemaps**
+    * **Color scales** and **legends**
+    * **Labels**
+    * **Popups**
+
+* **Function `mapview`** produces an interactive map given a spatial object
+    * `zcol="..."` specifies the **attribute** used for symbology 
+    * `legend=TRUE` adds a **legend**
+
+```{r, eval=FALSE}
+library(sf)
+library(mapview)
+states = st_read("USA_2_GADM_fips.shp")
+mapview(states, zcol = "NAME_1", legend = TRUE)
+```
+
+```{r, echo=FALSE, fig.cap="Intractive map made with `mapview`", out.width="100%"}
+knitr::include_graphics("images/mapview.png")
+```
+
+## Books
+
+* **Hierarchical Modeling and Analysis for Spatial Data** (1st ed 2003, 2nd ed. 2014)
+* **Model-based Geostatistics** (2007)
+* **Applied Spatial Data Analysis with R** (1st ed. 2008, 2nd ed. 2013)
+* **A Practical Guide for Geostatistical Mapping** (2009)
+* **Spatial Data Analysis in Ecology and Agriculture using R** (2012)
+* **Displaying Time Series, Spatial, and Space-Time Data with R** (1st ed. 2014, 2nd ed. 2018)
+* **Learning R for Geospatial Analysis** (2014)
+* **An Introduction to R for Spatial Analysis and Mapping** (2015)
+* **Spatial Point Patterns: Methodology and Applications with R** (2015)
+* **Geocomputation with R** (2019) (https://geocompr.robinlovelace.net/)
+* **Spatial Data Science** (2020?) (https://www.r-spatial.org/book/)
+
+## Online courses and tutorials
+
+* Courses
+    * https://mgimond.github.io/Spatial/index.html
+    * http://adamwilson.us/SpatialDataScience/
+    * http://geog.uoregon.edu/bartlein/courses/geog490/index.html
+    * https://zia207.github.io/geospatial-data-science.github.io/index.html
+    * http://132.72.155.230:3838/r/ (This course)
+    * Another list here: https://geocompr.github.io/guestbook/
+* Tutorials
+    * https://datacarpentry.org/lessons/#geospatial-curriculum
+    * http://rspatial.org/
+    * http://www.nickeubank.com/gis-in-r/
+    * https://www.neonscience.org/resources/data-tutorials
+
+```{r include=FALSE}
+# automatically create a bib database for R packages
+knitr::write_bib(c(.packages(), 'bookdown', 'knitr', 'rmarkdown'), 'packages.bib')
+```
+
+

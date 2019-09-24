@@ -1,0 +1,23 @@
+bookdown::gitbook:
+  config: 
+    toc: 
+      collapse: section
+      scroll_highlight: yes
+      before : |
+        <a href="index.html"><img width="90%" style="margin: 5% 5% 0% 5%" src="images/BGUsig3E.svg"></a>
+      after: |
+        <li><a href="https://bookdown.org" target="blank">Published with bookdown</a></li>
+      toc_depth: 3
+    sharing: null
+    search: no
+  edit: null
+#    includes: 
+#      in_header: google_analytics.html
+#  download: ["pdf"]
+#bookdown::tufte_book2:
+#  toc: yes
+#  includes:
+#    in_header: preamble.tex
+#  latex_engine: xelatex
+#  citation_package: natbib
+#  keep_tex: yes

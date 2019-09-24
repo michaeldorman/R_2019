@@ -1,0 +1,67 @@
+# (APPENDIX) Appendix {-}
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(fig.align = 'center', collapse = TRUE, R.options = list(width = 80))
+```
+
+# Files
+
+[**Course data (ZIP file)**](https://www.dropbox.com/sh/odsq9nz4a4fe41v/AACHrKiQCqBHjnL9GP-bxN6da?dl=1)
+
+```
+.
+├── airports.geojson
+├── CO-EST2012-Alldata.csv
+├── CO-EST2012-alldata.pdf
+├── dates2.csv
+├── dates.csv
+├── dem2.tif
+├── dem.tif
+├── elevation.tif
+├── haifa.geojson
+├── landsat_04_10_2000.tif
+├── MOD13A3_2000_2019_dates2.csv
+├── MOD13A3_2000_2019_dates.csv
+├── MOD13A3_2000_2019.tif
+├── MOD13A3.A2000032.h20v05.006.2015138123528.hdf
+├── modis_average.tif
+├── modis_south.tif
+├── plants.dbf
+├── plants.prj
+├── plants.shp
+├── plants.shx
+├── rainfall.csv
+├── rainfall_pnt2.dbf
+├── rainfall_pnt2.prj
+├── rainfall_pnt2.shp
+├── rainfall_pnt2.shx
+├── rainfall_pnt.dbf
+├── rainfall_pnt.prj
+├── rainfall_pnt.shp
+├── rainfall_pnt.shx
+├── rainfall.tif
+├── reserve.dbf
+├── reserve_elev.tif
+├── reserve.prj
+├── reserve.shp
+├── reserve.shx
+├── srtm_43_06.tif
+├── srtm_44_06.tif
+├── state.dbf
+├── state.prj
+├── state.shp
+├── state.shx
+├── towns.geojson
+├── track.gpx
+├── USA_2_GADM_fips.cpg
+├── USA_2_GADM_fips.dbf
+├── USA_2_GADM_fips.prj
+├── USA_2_GADM_fips.qpj
+├── USA_2_GADM_fips.sbn
+├── USA_2_GADM_fips.sbx
+├── USA_2_GADM_fips.shp
+├── USA_2_GADM_fips.shx
+└── volcano.R
+
+0 directories, 52 files
+```

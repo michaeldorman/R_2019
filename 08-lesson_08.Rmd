@@ -1,0 +1,886 @@
+# Geometric operations with vector layers {#geometric-operations-with-vector-layers}
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(fig.align = 'center', collapse = TRUE, R.options = list(width = 80))
+```
+
+## Aim
+
+* Learn to join by location and by attributes
+* Learn to make geometric calculations between vector layers
+
+## Join by location
+
+For most of the examples in this Chapter, we are going to use the US **counties** and three **airports** layers (see **Lesson 07**) - 
+
+```{r}
+library(sf)
+
+airports = st_read(
+  "data/airports.geojson", 
+  stringsAsFactors = FALSE
+)
+county = st_read(
+  "data/USA_2_GADM_fips.shp", 
+  stringsAsFactors = FALSE
+)
+```
+
+* And **transform** them to the US National Atlas projection - 
+
+```{r}
+airports = st_transform(airports, 2163)
+county = st_transform(county, 2163)
+```
+
+
+* Join by spatial location, or **spatial join**, is one of the most common operations in spatial analysis
+* In a spatial join we are "attaching" attributes from one layer to another based on their **spatial relations**
+* In ArcGIS this is done using "Join data from another layer based on spatial location"
+
+```{r, echo=FALSE, fig.cap="Join by location in ArcGIS: step 1", out.width="100%"}
+knitr::include_graphics("images/lesson_08_arcgis_join_by_location1.png")
+```
+
+```{r, echo=FALSE, fig.cap="Join by location in ArcGIS: step 2", out.width="100%"}
+knitr::include_graphics("images/lesson_08_arcgis_join_by_location2.png")
+```
+
+* For simplicity, we will create a subset of the counties of New-Mexico only - 
+
+```{r}
+nm = county[county$NAME_1 == "New Mexico", ]
+```
+
+* Plot:
+
+```{r, fig.cap="The `nm` and `airports` layers", out.width="90%"}
+plot(st_geometry(nm))
+plot(
+  st_geometry(airports),
+  col = "red",
+  pch = 16, 
+  cex = 2,
+  add = TRUE
+)
+```
+
+* Note: `pch` = point shape, `cex` = point size (see `?points`)
+
+* Given two layers `x` and `y`, a function call of the form `st_join(x, y)` returns the `x` layer along with **matching attributes** from `y`
+* Note: the default is join by **intersection**, other options possible (see `join` parameter in `?st_join`)
+* For example, here is how we join the `airports` layer with the matching **county attributes** - 
+
+```{r}
+st_join(airports, nm)
+```
+
+* Question: what do you think happens in the following case? How many features does the result have, and why?
+
+```{r}
+st_join(nm, airports)
+```
+
+## Subsetting by location
+
+* We can create **subsets** based on intersection with **another layer** using the `[` operator
+* An expression of the form `x[y, ]` returns a subset of `x` features that **intersect** `y`
+* For example - 
+
+```{r}
+nm1 = nm[airports, ]
+```
+
+* Plot - 
+
+```{r, fig.cap="Subset of the `nm` layer based on intersection with `airports`", out.width="90%"}
+plot(st_geometry(nm))
+plot(st_geometry(nm1), col = "lightblue", add = TRUE)
+plot(st_geometry(airports), col = "red", pch = 16, cex = 2, add = TRUE)
+```
+
+* Question 1: what will be the result of `airports[nm, ]`?
+* Question 2: what will be the result of `nm[nm[20, ], ]`?
+
+## Geometric calculations
+
+**Geometric operations** on vector layers can conceptually be divided into **three groups** according to their output -
+
+* **Numeric** values: Functions that summarize geometrical properties of - 
+    * A **single layer** (e.g. area, length)
+    * A **pair of layers** (e.g. distance)
+* **Logical** values: Functions that evaluate whether a certain condition holds true, regarding -
+    * A **single layer** (e.g. geometry is valid) 
+    * A **pair of layers** (e.g. feature A intersects feature B)
+* **Spatial** layers: Functions that create a new layer based on - 
+    * A **single layer** (e.g. centroids) 
+    * A **pair of layers** (e.g. intersection area)
+
+### Numeric
+
+* There are several functions to calculate **numeric geometric properties** of vector layers in package `sf` - 
+    * `st_length`
+    * `st_area`
+    * `st_distance`
+    * `st_bbox`
+    * `st_dimension`
+
+* For example, we can calculate the **area** of each feature in the `states` layer (i.e. each state) using `st_area` -
+
+```{r}
+county$area = st_area(county)
+county$area[1:3]
+```
+
+* The **result** is an object of class `units` -
+
+```{r}
+class(county$area)
+```
+
+* **CRS units** (e.g. meters) are used by default
+
+* We can convert measurements an **ordinary** `numeric` vector with `as.numeric` - 
+
+```{r}
+as.numeric(county$area[1:3])
+```
+
+* We can convert measurements to **different units** with `set_units` from package `units` (see `?valid_udunits`) - 
+
+```{r}
+library(units)
+
+county$area = set_units(county$area, "km^2")
+county$area[1:3]
+```
+
+* Inspecting the new `"area"` column -
+
+```{r, fig.cap="Calculated `area` attribute", out.width="100%", fig.width=7, fig.height=4.5}
+plot(county[, "area"])
+```
+
+* An example of a numeric operator on a **pair** of geometries is **geographical distance**
+* Distances can be calculated using function `st_distance` -
+
+```{r}
+d = st_distance(airports, nm)
+```
+
+* The result is a **matrix** of `units` values - 
+
+```{r}
+d[, 1:4]
+```
+
+* In the **distance matrix** - 
+    * **rows** refer to features of `x`
+    * **columns** refer to features of `y`
+
+```{r}
+dim(d)
+```
+
+* Just like areas, distances can always be converted to different **units** with `set_units` - 
+
+```{r}
+d = set_units(d, "km")
+```
+
+```{r}
+d[, 1:4]
+```
+
+* To work with the distance `matrix`, it can be convenient to set row and column **names** -
+
+```{r}
+rownames(d) = airports$name
+colnames(d) = nm$NAME_2
+```
+
+```{r}
+d[1:3, 1:2]
+```
+
+* When row and column names are set, it is more convenient to find out the distance between a **specific** airport and a **specific** county - 
+
+```{r}
+d["Santa Fe Municipal", "Santa Fe", drop = FALSE]
+```
+
+### Logical
+
+* Given two layers, `x` and `y`, the following **logical geometric functions** check whether each feature in `x` maintains the specified **relation** with each feature in `y` -
+    * `st_intersects`
+    * `st_disjoint`
+    * `st_touches`
+    * `st_crosses`
+    * `st_within`
+    * `st_contains`
+    * `st_overlaps`
+    * `st_covers`
+    * `st_covered_by`
+    * `st_equals`
+    * `st_equals_exact`
+
+* When specifying `sparse=FALSE` the functions return a **logical** `matrix`
+* Each **element** `i,j` in the matrix is `TRUE` when `f(x[i], y[j])` is `TRUE`
+* For example, this creates a matrix of **intersection** relations between counties - 
+
+```{r}
+int = st_intersects(nm, nm, sparse = FALSE)
+```
+
+```{r}
+int[1:4, 1:4]
+```
+
+```{r, echo=FALSE, fig.cap="Intersection between counties in New Mexico (`nm`)", out.width="100%"}
+int1 = apply(int, 2, rev)
+int1 = t(int1)
+image(int1, col = c("lightgrey", "red"), asp = 1, axes = FALSE)
+axis(3, at = seq(0, 1, 1/(nrow(int1)-1)), labels = nm$NAME_2, las = 2, lwd = 0, lwd.ticks = 1, cex.axis = 0.75)
+axis(2, at = seq(0, 1, 1/(nrow(int1)-1)), labels = rev(nm$NAME_2), las = 1, pos = -0.015, lwd = 0, lwd.ticks = 1, cex.axis = 0.75)
+```
+
+```{r, echo=FALSE, fig.cap="Using `st_touches` instead of `st_intersects`", out.width="100%"}
+int = st_touches(nm, nm, sparse = FALSE)
+int1 = apply(int, 2, rev)
+int1 = t(int1)
+image(int1, col = c("lightgrey", "red"), asp = 1, axes = FALSE)
+axis(3, at = seq(0, 1, 1/(nrow(int1)-1)), labels = nm$NAME_2, las = 2, lwd = 0, lwd.ticks = 1, cex.axis = 0.75)
+axis(2, at = seq(0, 1, 1/(nrow(int1)-1)), labels = rev(nm$NAME_2), las = 1, pos = -0.015, lwd = 0, lwd.ticks = 1, cex.axis = 0.75)
+```
+
+* Question: How can we calculate `airports` count per county in `nm`, using `st_intersects`?
+
+```{r, echo=FALSE, fig.cap="Airport count per county in New Mexico", out.width="80%"}
+x = st_intersects(nm, airports, sparse = FALSE)
+x = rowSums(x)
+opar = par(mar = rep(0, 4))
+plot(st_geometry(nm))
+text(st_coordinates(st_centroid(st_geometry(nm))), as.character(x), cex = 1.5)
+par(opar)
+```
+
+### Spatial
+
+* `sf` provides common **geometry-generating** functions applicable to **individual** geometries, such as - 
+    * `st_centroid`
+    * `st_buffer`
+    * `st_sample`
+    * `st_convex_hull`
+    * `st_voronoi`
+
+```{r, echo=FALSE, fig.cap="Geometry-generating operations on individual layers", fig.width=6, fig.height=4, out.width="100%"}
+set.seed(1)
+x = st_multipoint(matrix(runif(10), ncol = 2))
+x = st_buffer(st_sfc(lapply(1:3, function(x) st_point(c(x,x)))), 0.2 * 1:3)
+
+opar = par(mfrow=c(2,3), mar = rep(1, 4))
+
+plot(x, border = '#ff333388')
+plot(st_centroid(x), add = TRUE, pch = 3)
+title("st_centroid")
+
+plot(x, border = '#ff333388')
+plot(st_buffer(x, dist = 0.1), add = TRUE, pch = 3)
+plot(st_buffer(x, dist = 0.2), add = TRUE, pch = 3)
+plot(st_buffer(x, dist = 0.3), add = TRUE, pch = 3)
+plot(st_buffer(x, dist = 0.4), add = TRUE, pch = 3)
+plot(st_buffer(x, dist = 0.5), add = TRUE, pch = 3)
+title("st_buffer")
+
+s = split(x, 1:3)
+s = lapply(s, st_sample, size = 5)
+s = lapply(s, st_combine)
+s = do.call(c, s)
+
+plot(x, border = '#ff333388')
+plot(s, add = TRUE, pch = 3)
+title("st_sample")
+
+plot(s, col = '#ff333388', pch = 3)
+plot(st_convex_hull(s), add = TRUE, pch = 3)
+title("st_convex_hull")
+
+s = st_union(s)
+v = st_voronoi(s)
+
+plot(s, col = '#ff333388', pch = 3)
+plot(v, col = NA, border = 1, axes = FALSE, add = TRUE)
+title("st_voronoi")
+
+par(opar)
+```
+
+* For example, the following expression uses `st_centroid` to create a layer of **state centroids** - 
+
+```{r, warning=FALSE}
+ctr = st_centroid(nm)
+```
+
+* Plot:
+
+```{r, fig.cap="Centroids of New Mexico counties", fig.width=5, fig.height=5, out.width="65%", warning=FALSE}
+opar = par(mar = rep(0, 4))
+plot(
+  st_geometry(nm), 
+  border = "grey"
+)
+plot(
+  st_geometry(ctr), 
+  col = "red", pch = 3, 
+  add = TRUE
+)
+par(opar)
+```
+
+* What is the distance between the **centroids** of California and New Jersey?
+
+```{r}
+ca = county[county$NAME_1 == "California", ]
+nj = county[county$NAME_1 == "New Jersey", ]
+
+ca_ctr = st_centroid(st_union(ca))
+nj_ctr = st_centroid(st_union(nj))
+
+d = st_distance(ca_ctr, nj_ctr)
+
+set_units(d, "km")
+```
+
+* Note: we are using `st_union` to combine the counties into a single geometry and to "dissolve" the borders
+
+* Plot:
+
+```{r, fig.cap="California and New Jersey centroids", out.width="90%"}
+opar = par(mar = rep(0, 4))
+plot(
+  st_geometry(county), 
+  border = "grey"
+)
+plot(
+  c(ca_ctr, nj_ctr), 
+  col = "red", pch = 16, cex = 2, 
+  add = TRUE
+)
+par(opar)
+```
+
+* How can we draw the corresponding **line**?
+* First, we can **combine** the points into a single `sfc` object - 
+
+```{r}
+p = c(ca_ctr, nj_ctr)
+p
+```
+
+* Second, we can use `st_combine` to **transform** the points into a single `MULTIPOINT` geoemtry
+* `st_combine` is similar to `st_union`, but only combines and **does not dissolve**
+* Question: compare the results of `st_union(nm)` and `st_combine(nm)`
+
+```{r, eval=FALSE}
+p = st_combine(p)
+p
+```
+
+```{r, echo=FALSE, size="scriptsize"}
+p = st_combine(p)
+p
+```
+
+* The `st_cast` function can be used to convert between different **geometry types**
+* The `st_cast` function accepts - 
+    * The **input layer**
+    * The destination **geometry type**
+* Finally, we can use `st_cast` to **convert** a `MULTIPOINT` geometry to a `LINESTRING` geometry
+
+```{r}
+l = st_cast(p, "LINESTRING")
+```
+
+* Note: Meaningless `st_cast` operations will fail: for example, try `st_cast(l, "POLYGON")`
+
+```{r, echo=FALSE, fig.cap="California and New Jersey centroids, with a line", out.width="90%"}
+plot(
+  st_geometry(county), 
+  border = "grey"
+)
+plot(
+  st_geometry(ca_ctr), 
+  col = "red", pch = 16, cex = 2, 
+  add = TRUE
+)
+plot(
+  st_geometry(nj_ctr), 
+  col = "red", pch = 16, cex = 2,
+  add = TRUE
+)
+plot(
+  l, 
+  col = "red",
+  add = TRUE
+)
+```
+
+* Another example is the **buffer** function `st_buffer`
+* For example, here is how we can calculate 100 km buffers around the `airports` -
+
+```{r}
+# Method 1 - 'dist' is 'numeric'
+airports_100 = st_buffer(
+  airports, 
+  dist = 100 * 10^3
+)
+# Method 2 - 'dist' is 'units'
+airports_100 = st_buffer(
+  airports, 
+  dist = set_units(100, "km")
+)
+```
+
+```{r, echo=FALSE, fig.cap="`airports` buffered by 100 km", out.width="90%"}
+plot(st_geometry(nm))
+plot(st_geometry(airports_100), add = TRUE)
+```
+
+* Other **geometry-generating** functions work on **pairs** of input geometries -
+    * `st_intersection`
+    * `st_difference`
+    * `st_sym_difference`
+    * `st_union`
+
+```{r, echo=FALSE, fig.cap="Geometry-generating operations on pairs of layers", fig.width=7, fig.height=4, out.width="100%"}
+x = st_point(c(0, 0))
+x = st_buffer(x, 0.5)
+y = st_point(c(0.5, 0))
+y = st_buffer(y, 0.5)
+
+xy = c(x, y)
+
+opar = par(mfrow=c(2,3), mar=rep(0.7, 4))
+
+plot(xy, border = NA)
+plot(x, add = TRUE, col = '#ff333388')
+plot(y, add = TRUE, col='#33ff3388')
+title("x: red, y: green")
+
+plot(xy, border = 'grey')
+plot(st_intersection(x, y), col = 'lightblue', add = TRUE)
+title("st_intersection(x, y)")
+
+plot(xy, border = 'grey')
+plot(st_difference(x, y), col = 'lightblue', add = TRUE)
+title("st_difference(x, y)")
+
+plot.new()
+
+plot(xy, border = 'grey')
+plot(st_sym_difference(x, y), col = 'lightblue', add = TRUE)
+title("st_sym_difference(x, y)")
+
+plot(xy, border = 'grey')
+plot(st_union(x, y), col = 'lightblue', add = TRUE)
+title("st_union(x, y)")
+
+par(opar)
+```
+
+* How can we calculate the area that is within 100 km range of **all** three airports at the same time?
+* We can find the area of **intersection** of the three airports, using `st_intersection` - 
+
+```{r, warning=FALSE}
+inter1 = st_intersection(
+  airports_100[1, ], airports_100[2, ]
+)
+inter2 = st_intersection(
+  inter1, airports_100[3, ]
+)
+```
+
+* Plot:
+
+```{r, fig.cap="Intersection of three `airports` buffers", out.width="90%", warning=FALSE}
+plot(st_geometry(nm))
+plot(st_geometry(airports_100), add = TRUE)
+plot(inter2, col = "lightblue", add = TRUE)
+```
+
+* How can we calculate the area that is at within 100 km range of **at least one** of the three airports? 
+* We can **"dissolve"** the buffers, using `st_union` - 
+
+```{r}
+airports_100u = st_union(airports_100)
+```
+
+* Plot:
+
+```{r, fig.cap="`airports` buffered by 100 km, after `st_union`", out.width="90%"}
+opar = par(mar = rep(0, 4))
+plot(st_geometry(nm))
+plot(st_geometry(airports_100u), add = TRUE)
+par(opar)
+```
+
+* We don't have to dissolve **all** features - we can also dissolve by **attribute** or by **location**
+* To demonstrate aggregation/dissolving **by attribute**, let's take a subset with all counties of Arizona and Utah - 
+
+```{r}
+s = county[county$NAME_1 %in% c("Arizona", "Utah"), ]
+```
+
+* Plot:
+
+```{r, fig.cap="Subset of two states from `county`", out.width="100%", warning=FALSE}
+plot(s[, "NAME_1"])
+```
+
+* As shown before, dissolving **all** features into a single feature is done with `st_union` - 
+
+```{r}
+s1 = st_union(s)
+```
+
+* Plot - 
+
+```{r, fig.cap="Union of all counties in `s`", out.width="90%", warning=FALSE}
+plot(s1)
+```
+
+* Aggregating/dissolving **by attributes** can be done with `aggregate` (or using `dplyr` functions) - 
+
+```{r}
+# Method 1
+s2 = aggregate(
+  x = s[, "area"], 
+  by = st_set_geometry(s[, "NAME_1"], NULL), 
+  FUN = sum
+)
+# (Method 2 - 'dplyr')
+s2 = s %>% 
+  group_by(NAME_1) %>% 
+  summarize(area = sum(area))
+```
+
+* Using **Method 1** the unit of measurement is lost, so we need to **reconstruct** it - 
+
+```{r}
+s2$area = set_units(as.numeric(s2$area), "km^2")
+```
+
+```{r, echo=FALSE, fig.cap="Union by state name of `s`", out.width="100%", warning=FALSE}
+opar = par(mar = rep(0, 4))
+plot(s2[, "area"])
+par(opar)
+```
+
+* The **Convex Hull** of a set X of points is the smallest convex set that contains X
+
+```{r, echo=FALSE, fig.cap="Convex Hull: elastic-band analogy", out.width="40%"}
+knitr::include_graphics("images/lesson_08_convex_hull.png")
+```
+
+https://en.wikipedia.org/wiki/Convex_hull
+
+* For example - 
+
+```{r}
+h = st_convex_hull(nm1)
+```
+
+* Plot - 
+
+```{r, fig.cap="Convex hull polygons for two counties in New Mexico", out.width="90%", warning=FALSE}
+plot(st_geometry(nm1))
+plot(st_geometry(h), add = TRUE, border = "red")
+```
+
+* Question: How can we calculate the convex hull of all polygons in `nm1`?
+
+```{r, echo=FALSE, fig.cap="Convex Hull of multiple polygons", out.width="80%"}
+h = st_convex_hull(st_union(nm1))
+plot(st_geometry(nm1))
+plot(st_geometry(h), add = TRUE, border = "red")
+```
+
+* Suppose we build a **tunnel** 10 km wide between the centroids of `"Harding"` and `"Sierra"` counties in New Mexico
+* **Which** counties does the tunnel go through?
+
+```{r, warning=FALSE}
+w = nm[nm$NAME_2 %in% c("Harding", "Sierra"), ]
+w_ctr = st_centroid(w)
+w_ctr_buf = st_buffer(w_ctr, dist = 5000)
+w_ctr_buf_u = st_union(w_ctr_buf)
+w_ctr_buf_u_ch = st_convex_hull(w_ctr_buf_u)
+nm_w = nm[w_ctr_buf_u_ch, ]
+nm_w$NAME_2
+```
+
+* Note: we can use `text` with `st_coordinates` to add labels (see next slide)
+
+```{r, fig.cap='Tunnel between "Sierra" and "Harding" county centroids', out.width="100%", warning=FALSE}
+opar = par(mar = rep(0, 4))
+plot(
+  st_geometry(nm_w), 
+  border = NA, 
+  col = "lightblue"
+)
+plot(
+  st_geometry(nm), 
+  add = TRUE
+)
+plot(
+  st_geometry(w_ctr_buf_u_ch), 
+  add = TRUE
+)
+text(
+  st_coordinates(st_centroid(nm_w)),
+  nm_w$NAME_2
+)
+par(opar)
+```
+
+* How is the area of the "tunnel" **divided** between the various counties that it crosses?
+* We can use the fact that `st_intersection(x, y)` returns all (non-empty) geometries resulting from applying the operation to all geometry pairs in `x` and `y` -
+
+```{r, warning=FALSE}
+int = st_intersection(w_ctr_buf_u_ch, nm_w)
+area = st_area(int)
+area
+prop = area / sum(area)
+prop
+```
+
+* Plot - 
+
+```{r, fig.cap="Proportion of tunnel area within each county", out.width="90%", warning=FALSE}
+opar = par(mar = rep(0, 4))
+plot(
+  st_geometry(nm_w),
+  border = "darkgrey"
+)
+plot(
+  int,
+  col = rainbow(7),
+  border = "grey",
+  add = TRUE
+)
+text(
+  st_coordinates(st_centroid(int)),
+  paste0(round(prop, 2)*100, "%"),
+  cex = 2
+)
+par(opar)
+```
+
+## Join by attributes
+
+* We can join a **vector layer** and a **table** exactly the same way as **two tables**, e.g. using the `left_join` function from `dplyr`
+* This is analogous to **"Join attributes from a table"** in ArcGIS
+* In the next example we will join county-level **demographic data** (from `CO-EST2012-Alldata.csv`) with the `county` layer
+* The join will be based on the common **Federal Information Processing Standards** (FIPS) code of each county
+
+```{r, echo=FALSE, fig.cap="Join by attributes in ArcGIS", out.width="100%"}
+knitr::include_graphics("images/lesson_08_arcgis_join_by_attributes.png")
+```
+
+* Let's **read** the `CO-EST2012-Alldata.csv` file - 
+
+```{r}
+dat = read.csv(
+  "data/CO-EST2012-Alldata.csv", 
+  stringsAsFactors = FALSE
+)
+```
+
+* And **subset** the columns we are interested in - 
+
+```{r}
+dat = dat[, c("STATE", "COUNTY", "CENSUS2010POP")]
+```
+
+```{r}
+head(dat)
+```
+
+* Records where `COUNTY` code is `0` are states **sums**, which we will remove - 
+
+```{r}
+dat = dat[dat$COUNTY != 0, ]
+```
+
+```{r}
+head(dat)
+```
+
+* To get the county FIPS code we need to **standardize** -
+    * The state code to a **two-digit** code 
+    * the county code to **three-digit** code
+* The `formatC` function can be used to change between various numeric **formats**, using different "scenarios"
+* The **"add leading zeros"** scenario is specified using `width=n`, where `n` is the required number of digits, and `flag="0"` - 
+
+```{r}
+dat$STATE = formatC(dat$STATE, width = 2, flag = "0")
+dat$COUNTY = formatC(dat$COUNTY, width = 3, flag = "0")
+dat$FIPS = paste0(dat$STATE, dat$COUNTY)
+```
+
+* Now we have a column named `FIPS` with exactly the **same format** as in the `county` layer - 
+
+```{r}
+head(dat)
+```
+
+* Now we can **join** the `county` layer with the `dat` table, based on the common column named `FIPS` -
+
+```{r}
+library(dplyr)
+
+county = left_join(
+  county,
+  dat[, c("FIPS", "CENSUS2010POP")],
+  by = "FIPS"
+)
+```
+
+* Note: we are using a `left_join`, therefore the `county` layer remains as is; features that do not have a matching `FIPS` value in `dat` will have `NA` in the new `CENSUS2010POP` column
+
+* Plot with **linear** breaks - 
+
+```{r, eval=FALSE}
+plot(county[, "CENSUS2010POP"])
+```
+
+* Plot with **quantile** breaks - 
+
+```{r, eval=FALSE}
+plot(county[, "CENSUS2010POP"], breaks = "quantile")
+```
+
+* Note: the number of color categories can be controlled with `nbreaks`
+
+```{r, echo=FALSE, fig.cap="Population size per county in the US, linear breaks", out.width="100%", warning=FALSE}
+plot(county[, "CENSUS2010POP"])
+```
+
+```{r, echo=FALSE, fig.cap="Population size per county in the US, quantile breaks", out.width="100%", warning=FALSE}
+plot(county[, "CENSUS2010POP"], breaks = "quantile")
+```
+
+* Now that we know the **amount** and **area size** we can calculate population **density** per county - 
+
+```{r}
+county$density = county$CENSUS2010POP / county$area
+```
+
+* Note: the measurement units for the new column are **automatically** determined based on the inputs
+* Plot:
+
+```{r, fig.cap="Population density in the US, quantile breaks", out.width="100%", warning=FALSE}
+plot(county[, "density"], breaks = "quantile")
+```
+
+* Question 1: how many features in `county` did not have a matching FIPS code in `dat`? What are their names?
+
+```{r, include=FALSE}
+sum(!county$FIPS %in% dat$FIPS)
+county$NAME_2[!county$FIPS %in% dat$FIPS]
+```
+
+* Question 2: how many features in `dat` do not have a matching FIPS code in `county`?
+
+```{r, include=FALSE}
+sum(!dat$FIPS %in% county$FIPS)
+```
+
+* We can calculate the **average population density** in the US, by dividing the total population by the total area - 
+
+```{r}
+sum(county$CENSUS2010POP, na.rm = TRUE) / 
+  sum(county$area)
+```
+
+* According to **Wikipedia** the correct value is **40.015**
+* Note: simply averaging the `density` column gives an overestimation, because all counties get equal weight while in reality the smaller counties are more dense - 
+
+```{r}
+mean(county$density, na.rm = TRUE)
+```
+
+## Recap: main data structures learned
+
+| Category | Class | Lesson |
+|---|---|:-:|
+| Vector | `numeric`, `character`, `logical` | 02 |
+| Date | `Date` | 03 |
+| Table | `data.frame` | 04 |
+| Matrix | `matrix` | 05 |
+| Array | `array` | 05 |
+| Raster |  `RasterLayer`, `RasterStack`, `RasterBrick` | 05 |
+| Vector layer | `sfg`, `sfc`, `sf` | 07 | 
+| Units | `units` | 07 | 
+| List | `list` | 10 | 
+
+Table: Main data structures in the course
+
+## Advanced graphics with `ggplot2`
+
+```{r}
+library(ggplot2)
+
+state = st_read("data/state.shp", stringsAsFactors = FALSE)
+state = state[!(state$NAME_1 %in% c("Alaska", "Hawaii")), ]
+
+county$density = as.numeric(county$density)
+```
+
+```{r, fig.cap="Population density in the US, using `ggplot2`", out.width="100%", warning=FALSE}
+ggplot() +
+  geom_sf(
+    data = county,
+    aes(fill = density),
+    colour = NA
+  ) +
+  geom_sf(
+    data = state,
+    colour = "white", size = 0.25, fill = NA
+  ) +
+  scale_fill_distiller(
+    name = expression(paste("Density (", km^-2, ")")),
+    palette = "Spectral",
+    trans = "log10", 
+    labels = as.character, breaks = 10^(-1:5)
+  ) +
+  theme_bw() +
+  theme(
+    axis.text.y = element_text(angle = 90, hjust = 0.5),
+    panel.border = element_blank()
+  )
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,673 @@
+# Spatial interpolation of point data {#spatial-interpolation-of-point-data}
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(fig.align = 'center', collapse = TRUE, R.options = list(width = 80))
+```
+
+## Aims
+
+* Use geostatistical functions from the `gstat` package to spatially interpolate point data
+* Practically learn to - 
+    * Calculate an empirical variogram
+    * Fit a variogram model
+    * Interpolate using three methods: 
+        * Inverse Distance Weighted (IDW) interpolation
+        * Ordinary Kriging (OK)
+        * Universal Kriging (UK)
+    * Evaluate interpolation accuracy using Leave-One-Out Cross Validation
+
+## Spatial interpolation
+
+* **Spatial interpolation** is the prediction of a given phenomenon in unmeasured locations
+* For that, we need a spatial interpolation **model** - a set of procedures to calculate **predicted values** of the variable of interest, given **calibration data**
+* Calibrarion data usually includes - 
+    * **Field measurements** - available for a limited number of locations, for example: rainfall data from meteorological stations
+    * **Covariates** - available for each and every location within the area of interest, for example: elevation from a DEM
+* Spatial interpolation models can be divided into two categories - 
+    * **Deterministic models** - Models using arbitrary parameter values, for example: IDW
+    * **Statistical models** - Models using parameters chosen objectively based on the data, for example: Kriging
+
+```{r, echo=FALSE, fig.cap="Spatial interpolation (Input elevation point data, Interpolated elevation surface)", out.width="40%"}
+knitr::include_graphics(c("images/lesson_12_interpolation_elev_input.png", "images/lesson_12_interpolation_elev_output.png"))
+```
+
+http://desktop.arcgis.com/en/arcmap/10.3/tools/spatial-analyst-toolbox/understanding-interpolation-analysis.htm
+
+```{r, echo=FALSE, fig.cap="Spatial interpolation (Point locations of ozone monitoring stations, Interpolated prediction surface)", out.width="28%"}
+knitr::include_graphics(c("images/lesson_12_interpolation_ozone_input.png", "images/lesson_12_interpolation_ozone_output.png"))
+```
+
+http://desktop.arcgis.com/en/arcmap/10.3/tools/spatial-analyst-toolbox/understanding-interpolation-analysis.htm
+
+* Keep in mind that data **structure** does not imply **meaning**
+* For example, it does not make sense to spatially interpolate point data when they refer to a **localized phenomenon**
+
+```{r, echo=FALSE, fig.cap="Localized phenomenon", out.width="90%"}
+knitr::include_graphics("images/lesson_12_point_vs_continuous_phenomena1.png")
+```
+
+https://edzer.github.io/UseR2016/
+
+* Keep in mind that data **structure** does not imply **meaning**
+* Similarly, it does not make sense to sum up point measurements of a **continuous phenomenon**
+
+```{r, echo=FALSE, fig.cap="Continuous phenomenon", out.width="90%"}
+knitr::include_graphics("images/lesson_12_point_vs_continuous_phenomena2.png")
+```
+
+https://edzer.github.io/UseR2016/
+
+* The predicted value for a particular point is calculated as a **weighted average** of measured values in other points
+
+$$\hat{Z}(s_{0})=\frac{\sum_{i=1}^{n}w(s_{i})Z(s_{i})}{\sum_{i=1}^{n}w(s_{i})}$$
+
+* Where - 
+    * $\hat{Z}(s_{0})$ is the predicted value at location $s_{0}$
+    * $w(s_{i})$ is the weight of measured point $i$
+    * $Z(s_{i})$ is the value of measured point $i$
+* The weights $w(s_{i})$ of each measured point are a function its distance from the predicted point
+
+```{r, echo=FALSE, fig.cap="Distances between predicted point and all measured points", out.width="60%"}
+knitr::include_graphics("images/lesson_12_interpolation_distances.png")
+```
+
+http://desktop.arcgis.com/en/arcmap/10.3/tools/spatial-analyst-toolbox/how-kriging-works.htm
+
+* In IDW, the weight is the inverse of distance to the power of $p$ -
+
+$$w(s_{i})=\frac{1}{d(s_{0}, s_{i})^p}$$
+
+* Where - 
+    * $w(s_{i})$ is the weight of measured point $i$
+    * $d(s_{0}, s_{i})$ is the distance between predicted point $s_{0}$ and measured point $s_{i}$
+* The default is $p=2$ - 
+
+$$w(s_{i})=\frac{1}{d(s_{0}, s_{i})^2}$$
+
+```{r, include=FALSE}
+library(sf)
+library(stars)
+library(gstat)
+library(automap)
+
+# Read rainfall data
+rainfall = st_read("data/rainfall_pnt.shp", stringsAsFactors = FALSE)
+m = c("sep","oct","nov","dec","jan","feb","mar","apr","may")
+rainfall$annual = apply(st_set_geometry(rainfall[, m], NULL), 1, sum)
+
+# Extract elevation data
+elevation = read_stars("data/elevation.tif")
+names(elevation) = "elev_1km"
+x = aggregate(elevation, rainfall, function(x) x[1], as_points = FALSE)
+rainfall$elev_1km = x$elev_1km
+rainfall = rainfall[!is.na(rainfall$elev_1km), ]
+
+# IDW
+g1 = gstat(
+  formula = annual ~ 1,
+  data = rainfall,
+  set = list(idp = 0.25)
+)
+g2 = gstat(
+  formula = annual ~ 1,
+  data = rainfall,
+  set = list(idp = 2)
+)
+g3 = gstat(
+  formula = annual ~ 1,
+  data = rainfall,
+  set = list(idp = 16)
+)
+
+# Predict
+z1 = predict(g1, elevation)
+z2 = predict(g2, elevation)
+z3 = predict(g3, elevation)
+```
+
+```{r, echo=FALSE, warning=FALSE, fig.cap="Spatial interpolation of annual rainfall using IDW with different values of $p$", fig.width=8, fig.height=4, out.width="50%"}
+plot(z1, col = rainbow(20), main = "p=0.25", reset = FALSE)
+plot(st_geometry(rainfall), pch = 3, col = "black", add = TRUE)
+plot(z2, col = rainbow(20), main = "p=2", reset = FALSE)
+plot(st_geometry(rainfall), pch = 3, col = "black", add = TRUE)
+plot(z3, col = rainbow(20), main = "p=16", reset = FALSE)
+plot(st_geometry(rainfall), pch = 3, col = "black", add = TRUE)
+```
+
+```{r, include=FALSE}
+# Nearest Neighbor interpolation
+grid = st_as_sf(elevation)
+grid = st_centroid(grid)
+grid = st_join(grid, rainfall[, "annual"], join = nngeo::st_nn)
+grid = st_rasterize(grid[, "annual"], elevation)
+```
+
+```{r, echo=FALSE, out.width="100%", fig.cap="Nearest Neighbor interpolation"}
+plot(grid, col = rainbow(20), reset = FALSE)
+plot(st_geometry(rainfall), add = TRUE)
+```
+
+```{r, include=FALSE}
+# Voronoi polygons
+vor = st_voronoi(st_union(rainfall))
+vor = st_cast(vor)
+s = elevation
+s[[1]][!is.na(s[[1]])] = 1
+s = st_as_sf(s, merge = TRUE)
+vor = st_intersection(vor, s)
+```
+
+```{r, echo=FALSE, out.width="100%", fig.cap="Voronoi polygons"}
+plot(grid, col = rainbow(20), reset = FALSE)
+plot(st_geometry(vor), col = NA, add = TRUE)
+plot(st_geometry(rainfall), add = TRUE)
+```
+
+* In Kriging, the weight is a particular function of distance known as the **variogram model**
+* The variogram model is fitted to characterize the autocorrelation structure in the measured data, based on the **empirical variogram**
+
+```{r, echo=FALSE, fig.cap="Variogram models (Spherical model, Exponential model)", out.width="45%"}
+knitr::include_graphics(c("images/lesson_12_variogram_model1.png", "images/lesson_12_variogram_model1.png"))
+```
+
+http://desktop.arcgis.com/en/arcmap/10.3/tools/spatial-analyst-toolbox/how-kriging-works.htm
+
+```{r, include=FALSE}
+library(sf)
+library(stars)
+library(gstat)
+library(automap)
+
+# Read rainfall data
+rainfall = st_read("data/rainfall_pnt.shp", stringsAsFactors = FALSE)
+m = c("sep","oct","nov","dec","jan","feb","mar","apr","may")
+rainfall$annual = apply(st_set_geometry(rainfall[, m], NULL), 1, sum)
+
+# Extract elevation data
+elevation = read_stars("data/elevation.tif")
+names(elevation) = "elev_1km"
+x = aggregate(elevation, rainfall, function(x) x[1], as_points = FALSE)
+rainfall$elev_1km = x$elev_1km
+rainfall = rainfall[!is.na(rainfall$elev_1km), ]
+
+# IDW
+g_idw = gstat(
+  formula = annual ~ 1,
+  data = rainfall
+)
+
+# OK
+v_ok = autofitVariogram(annual ~ 1, as(rainfall, "Spatial"))
+g_ok = gstat(
+  formula = annual ~ 1,
+  data = rainfall,
+  model = v_ok$var_model
+)
+
+# UK
+v_uk = autofitVariogram(annual ~ elev_1km, as(rainfall, "Spatial"))
+g_uk = gstat(
+  formula = annual ~ elev_1km,
+  model = v_uk$var_model,
+  data = rainfall
+)
+
+# Predict
+z_idw = predict(g_idw, elevation)
+z_ok = predict(g_ok, elevation)
+z_uk = predict(g_uk, elevation)
+```
+
+```{r, echo=FALSE, fig.cap="Spatial interpolation of annual rainfall using IDW, OK and UK", fig.width=8, fig.height=4, out.width="100%"}
+plot(z_idw, col = rainbow(20), main = "Inverse Distance Weighted", reset = FALSE)
+plot(st_geometry(rainfall), pch = 3, col = "black", add = TRUE)
+plot(z_ok, col = rainbow(20), main = "Ordinary Kriging", reset = FALSE)
+plot(st_geometry(rainfall), pch = 3, col = "black", add = TRUE)
+plot(z_uk, col = rainbow(20), main = "Universal Kriging", reset = FALSE)
+plot(st_geometry(rainfall), pch = 3, col = "black", add = TRUE)
+```
+
+* For the examples, we will load the `rainfall_pnt` layer - 
+
+```{r}
+library(sf)
+
+rainfall = st_read(
+  "data/rainfall_pnt.shp", 
+  stringsAsFactors = FALSE
+)
+```
+
+* And the `elevation.tif` raster - 
+
+```{r}
+library(stars)
+
+elevation = read_stars("data/elevation.tif")
+```
+
+* We also **re-calculate** the `annual` rainfall column - 
+
+```{r}
+m = c(
+  "sep", "oct", "nov", "dec", "jan",
+  "feb", "mar", "apr", "may"
+)
+rainfall$annual = apply(
+  st_set_geometry(rainfall[, m], NULL),
+  1,
+  sum
+)
+```
+
+* Plot - 
+
+```{r, eval=FALSE}
+plot(elevation, reset = FALSE)
+plot(st_geometry(rainfall), add = TRUE)
+```
+
+```{r, echo=FALSE, out.width="100%", fig.cap="Rainfall data points and elevation raster"}
+plot(elevation, reset = FALSE)
+plot(st_geometry(rainfall), add = TRUE)
+```
+
+* We will **subset** the `rainfall` layer to include only the points overlapping with the `elevation` layer
+* First, **extracting** the elevation values - 
+
+```{r}
+x = aggregate(elevation, rainfall, function(x) x[1], as_points = FALSE)
+rainfall$elev_1km = x[[1]]
+```
+
+* Then **subsetting** where extracted value is not `NA` -
+
+```{r}
+rainfall = rainfall[!is.na(rainfall$elev_1km), ]
+```
+
+* Plot - 
+
+```{r, eval=FALSE}
+plot(elevation, reset = FALSE)
+plot(st_geometry(rainfall), add = TRUE)
+```
+
+```{r, echo=FALSE, out.width="100%", fig.cap="Rainfall data points and elevation raster"}
+plot(elevation, reset = FALSE)
+plot(st_geometry(rainfall), add = TRUE)
+```
+
+## The `gstat` object
+
+* To interpolate, we first need to create an **object** of class `gstat`, using a **function** of the same name `gstat`
+* A `gstat` object contains **all necessary information** to conduct spatial interpolation, namely -
+    * The **model** definition
+    * The **calibration data**
+* Based on its arguments, the `gstat` function **"understands"** what type of interpolation model we want to use - 
+    * No variogram model → **IDW**
+    * Variogram model, no covariates → **Ordinary Kriging**
+    * Variogram model, with covariates → **Universal Kriging**
+
+```{r, echo=FALSE, fig.cap="\\texttt{gstat} predict methods", out.width="100%"}
+knitr::include_graphics("images/lesson_12_gstat_predict_method.svg")
+```
+
+Applied Spatial Data Analysis with R (2013)
+
+* We are going to use three **parameters** of the `gstat` function - 
+    * `formula` - The prediction **"formula"**; used to specify the names of the dependent variable and the covariates
+    * `data` - The calibration **data**
+    * `model` - The **variogram model**
+* To interpolate using the **IDW** method we create the following `gstat` object - 
+
+```{r}
+library(gstat)
+
+g = gstat(
+  formula = annual ~ 1,
+  data = as(rainfall, "Spatial")
+)
+```
+
+* Note: we need to specify the parameter names!
+
+## Working with `formula` objects
+
+* `formula` objects are used to specify **relation** between objects in R, in particular - the role of different data **columns** in **statistical models**
+* A `formula` object is **created** using the `~` operator, which separates names of **dependent variables** (to the left) and **independent variables** (to the right)
+* The `~ 1` part means there are **no independent variables**
+
+```{r}
+f = annual ~ 1
+f
+class(f)
+```
+
+* We can also **convert** `character` values to `formula` using the `as.formula` function - 
+
+```{r}
+f = "annual ~ 1"
+f
+class(f)
+```
+
+```{r}
+f = as.formula(f)
+f
+class(f)
+```
+
+## Making predictions
+
+* Now that our model is defined, we can use the `interpolate` function to **make predictions**
+* The `interpolate` function accepts - 
+    * A **raster**, such as `elevation`
+    * A **model**, such as a `gstat` model named `g`
+* The raster serves for two **purposes** - 
+    * Specifying the **locations** where we want to make predictions (in all methods)
+    * Specifying **covariate** values (in Universal Kriging only)
+
+```{r}
+z = predict(g, elevation)
+```
+
+* Plot:
+
+```{r, out.width="100%", fig.cap="Predicted values using IDW"}
+plot(z, reset = FALSE)
+plot(st_geometry(rainfall), add = TRUE)
+plot(st_contour(z), add = TRUE)
+```
+
+* Using a different color scale - 
+
+```{r, out.width="100%", fig.cap="Predicted values using IDW, using different color scale"}
+plot(z, col = rainbow(20), reset = FALSE)
+plot(st_geometry(rainfall), add = TRUE)
+plot(st_contour(z), add = TRUE)
+```
+
+## Ordinary Kriging
+
+* Kriging methods require a **variogram model**
+* As a first step, we can calculate the **empirical variogram** using `variogram` which accepts - 
+    * `formula` - Specifies the **dependent variable** and the **covariates**, just like in `gstat`
+    * `data` - The **point layer**
+
+```{r}
+v_emp_ok = variogram(
+  annual ~ 1, 
+  as(rainfall, "Spatial")
+)
+```
+
+* Using `plot` to examine it - 
+
+```{r, out.width="100%", fig.cap="Empyrical variogram"}
+plot(v_emp_ok)
+```
+
+* There are several ways to fit a **variogram model** to an empirical variogram
+* We will use the simplest one - **automatic fitting** using function `autofitVariogram` from package `automap` - 
+
+```{r}
+library(automap)
+
+v_mod_ok = autofitVariogram(
+  annual ~ 1, 
+  as(rainfall, "Spatial")
+)
+```
+
+* Note: use `show.vgms()` to display variogram function types
+
+* Plot:
+
+```{r, out.width="100%", fig.cap="Variogram model"}
+plot(v_mod_ok)
+```
+
+* The `$var_model` component of the resulting object specifies the **fitted model** - 
+
+```{r}
+v_mod_ok$var_model
+```
+
+* The variogram model is then **passed** to the `gstat` function, and then Ordinary Kriging interpolation can be done - 
+
+```{r}
+g = gstat(
+  formula = annual ~ 1,
+  model = v_mod_ok$var_model,
+  data = as(rainfall, "Spatial")
+)
+z = predict(g, elevation)
+```
+
+* **Universal Kriging** interpolation uses a model with one or more **covariates** / **independent variables**
+* The covariates need to be known for both - 
+    * The **point layer**, as a column such as `elev_1km` in `rainfall`
+    * The **predicted locations**, as raster values such as in `elevation`
+* The `formula` now **specifies** the name(s) of the covariate(s) to the right of the `~` symbol - 
+
+```{r}
+v_emp_uk = variogram(
+  annual ~ elev_1km, 
+  as(rainfall, "Spatial")
+)
+v_mod_uk = autofitVariogram(
+  annual ~ elev_1km, 
+  as(rainfall, "Spatial")
+)
+```
+
+* Another example: suppose that we did not have a DEM for Israel, but only the **elevation measurements** at the meteorological stations 
+* How can we produce an elevation raster using **Ordinary Kriging**?
+* First, we read the data - 
+
+```{r}
+modis_avg = read_stars("data/modis_average.tif")
+```
+
+* Second, we prepare the `gstat` object - 
+
+```{r}
+v = autofitVariogram(
+  altitude ~ 1, 
+  as(rainfall, "Spatial")
+)
+g = gstat(
+  formula = altitude ~ 1,
+  model = v$var_model,
+  data = rainfall
+)
+```
+
+* Finally, we interpolate - 
+
+```{r}
+z = predict(g, modis_avg)
+```
+
+* Plot - 
+
+```{r, out.width="100%", fig.cap="Ordinary Kriging prediction of elevation"}
+plot(z, reset = FALSE)
+plot(st_geometry(rainfall), add = TRUE)
+# plot(st_contour(z), add = TRUE)
+```
+
+* In the next example we use kriging inside a `for` **loop**, to make a series of predictions for **different variables**
+* We will use **Ordinary Kriging** to predict **monthly rainfall**, i.e. `sep` through `may` columns in the `rainfall` layer
+* In each `for` loop "round", the formula is **re-defined** according to the **current** month `i` - 
+
+```{r}
+i = "may"
+as.formula(paste0(i, " ~ 1"))
+```
+
+* **Setting up** -
+
+```{r}
+m = c(
+  "sep", "oct", "nov", "dec", "jan",
+  "feb", "mar", "apr", "may"
+)
+result = list()
+```
+
+* The `for` **loop** - 
+
+```{r}
+for(i in m) {
+  f = as.formula(paste0(i, " ~ 1"))
+  v = autofitVariogram(f, as(rainfall, "Spatial"))
+  g = gstat(
+    formula = f,
+    model = v$var_model,
+    data = as(rainfall, "Spatial")
+  )
+  z = predict(g, elevation)
+  z = z["var1.pred"]
+  result[[i]] = z
+}
+result = do.call(c, result)
+names(result) = m
+result = st_redimension(result)
+```
+
+* Plot: 
+
+```{r, out.width="100%", fig.cap="Montly rainfall predictions using Ordinary Kriging"}
+plot(result)
+```
+
+## Universal Kriging
+
+* Comparing the Ordinary Kriging and Universal Kriging variogram models - 
+
+```{r, out.width="100%", fig.cap="OK and UK variogram models"}
+plot(
+  v_emp_ok, 
+  model = v_mod_ok$var_model, 
+  ylim = c(0, 25000), 
+  main = "OK"
+)
+plot(
+  v_emp_uk, 
+  model = v_mod_uk$var_model, 
+  ylim = c(0, 25000), 
+  main = "UK"
+)
+```
+
+* Next we create a `gstat` **object** where the `formula` contains the **covariate** and the respective **variogram model** - 
+
+```{r}
+g = gstat(
+  formula = annual ~ elev_1km,
+  model = v_mod_uk$var_model,
+  data = rainfall
+)
+```
+
+* Note: the `elev_1km` column needs to be present in the `data`
+
+* The `interpolate` function needs another argument `xyOnly=FALSE`, to specify that the raster is **not only** used for prediction locations (X, Y) but also for **covariate data**
+
+```{r, error=TRUE}
+z = predict(g, elevation)
+```
+
+* We get an error!
+* The reason is that `interpolate` looks for a layer of the **same name** as specified in the `formula` of the `gstat` object
+
+* We can change the layer names to make sure they match - 
+
+```{r}
+names(elevation)
+```
+
+```{r}
+names(elevation) = "elev_1km"
+names(elevation)
+```
+
+* Now `interpolate` works - 
+
+```{r}
+z = predict(g, elevation)
+```
+
+* Plot:
+
+```{r, out.width="100%", fig.cap="Universal Kriging predictions"}
+plot(z, reset = FALSE)
+plot(st_geometry(rainfall), add = TRUE)
+plot(st_contour(z), add = TRUE)
+```
+
+## Cross-validation
+
+* In **Leave-One-Out Cross Validation** we -
+    * **Take out** one point out of the calibration data
+    * Make a **prediction** for that point
+    * **Repeat** for all points
+* In the end we get a table with an **observed value** and a **predicted value** for all points
+* We can run Leave-One-Out Cross Validation using the `gstat.cv` **function**, which accepts a `gstat` object - 
+
+```{r, eval=FALSE}
+cv = gstat.cv(g)
+```
+
+```{r, include=FALSE}
+cv = gstat.cv(g)
+```
+
+* The result can be **converted** back to an `sf` object - 
+
+```{r}
+cv = st_as_sf(cv)
+```
+
+```{r}
+cv
+```
+
+* The result of `gstat.cv` has the following **attributes** - 
+    * `var1.pred` - Predicted value
+    * `var1.var` - Variance (only for Kriging)
+    * `observed` - Observed value
+    * `residual` - Observed-Predicted
+    * `zscore` - Z-score (only for Kriging)
+    * `fold` - Cross-validation ID
+* A **bubble plot** is convenient to examine the residuals, since it shows positive and negative values in different color - 
+
+```{r, out.width="100%", fig.cap="Cross-validation residuals"}
+bubble(as(cv, "Spatial"), "residual")
+```
+
+* Using the "predicted" and "observed" columns we can calculate prediction accuracy indices, such as the **Root Mean Square Error (RMSE)** - 
+
+$$
+RMSE=\sqrt{\frac{\sum_{i=1}^{n} (pred_i-obs_i)^2}{n}}
+$$
+
+* Where $pred_i$ and $obs_i$ are **predicted** and **observed** values for point $i$, respectively
+
+```{r}
+sqrt(sum((cv$var1.pred - cv$observed)^2) / nrow(cv))
+```
+
+
+
+
+
+
+
+
+
+
+
+

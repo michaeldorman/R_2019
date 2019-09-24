@@ -1,0 +1,824 @@
+# Vectors {#vectors}
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(fig.align = 'center', collapse = TRUE, R.options = list(width = 80))
+```
+
+## Aims
+
+* Learning how to work with R code files
+* Getting to know the simplest data structure in R, the vector
+* Learning about subsetting, one of the fundamental operations with data
+
+## Editing code
+
+### Using code files
+
+* Computer code is stored as **plain text**
+* When writing computer code, we must use a **plain text editor**, such as **Notepad++** or **RStudio**
+* A **word processor**, such as **Microsoft Word**, is not a good choice for writing code, because - 
+    * Documents created with a Word Processor contain elements **other than** plain text (such as formatting), which are not processed, leading to confusion
+    * Word processors can automatically **correct** "mistakes" thereby introducing unintended changes in our code, such as capitalizing: `max(1)` → `Max(1)`
+
+* Any plain text file can be used to store **R code** 
+* Conventionally, R code files have the `*.R` file **extension**
+* **Complete** code files can be executed with `source`
+* Selected **parts** of code can be executed by marking the section and pressing **Ctrl+Enter**
+* Executing **one expression** can be done by standing inside it with the marker and pressing **Ctrl+Enter**
+
+```{r executing-r-code, fig.cap="Methods of executing R code", echo=FALSE, out.width="100%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_02_source.svg")
+```
+
+For example, we can run the file `volcano.R` which draws a 3D image of a volcano (Figure \@ref(fig:image-volcano-3d)). 
+
+```{r image-volcano-3d, fig.cap="3D image of the `volcano` dataset", fig.align="center"}
+source("data/volcano.R")
+```
+
+### RStudio keyboard stortcuts
+
+RStudio has numerous keyboard shortcuts for making it easier to edit and execute code files. Some useful RStudio keyboard shortcuts are given in Table \@ref(tab:rstudio-shortcuts). 
+
+| Shortcut | Action | 
+|---|---|
+| **Alt+Shift+K** | List of all shortcuts |
+| **Ctrl+1** | Moving cursor to the code editor | 
+| **Ctrl+2** | Moving cursor to the console |
+| **Ctrl+Enter** | Sending the current selection or line |
+| **Ctrl+Shift+P** | Re-sending last selection
+| **Ctrl+Alt+B** | Sending from top to current line |
+| **Ctrl+Shift+C** | Turn comment on or off |
+| **Tab** | Auto-complete |
+| **Ctrl+D** | Delete line |
+| **Ctrl+Shift+D** | Duplicate line |
+| **Ctrl+F** | Find and replace menu |
+| **Ctrl+S** | Save | 
+
+Table: (\#tab:rstudio-shortcuts) RStudio keyboard shortcuts
+
+## Assignment
+
+* So far we have been using R by **typing** expressions into the command line and observing the result on screen
+* That way R functions as a **"calculator"** - the results are not kept in computer memory
+
+```{r, echo=FALSE, out.width="100%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_02_print.svg")
+```
+
+* Storing objects in the temporary computer memory (RAM) is called **assignment**
+* Assignment is done using the **assignment operator** 
+
+* In an **assignment expression** we are storing an object, under a certain name, in the RAM
+* This is an essential operation in programming, because it make **automation** possible - reaching the goal step by step, while storing intermediate products
+* An assignment expression consists of - 
+    * The **expression** whose result we want to store
+    * The assignment **operator**, `=` or `<-`
+    * The **name** which will be assigned to the object
+* For example - 
+
+```{r}
+rateEstimate = (6617747987 - 6617746521) / 10
+```
+
+```{r, echo=FALSE, out.width="100%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_02_assignment1.svg")
+```
+
+* When we type an **object name** in the console, R **accesses** an object stored under that name in the RAM, and **calls** the `print` function on the object - 
+
+```{r}
+rateEstimate
+```
+
+```{r}
+print(rateEstimate)
+```
+
+```{r, echo=FALSE, out.width="100%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_02_assignment2.svg")
+```
+
+* What happens when we assign a new value to an **existing object**? The old object gets deleted, and its name is now pointing on the new value
+
+```{r}
+x = 55
+x
+```
+
+```{r}
+x = "Hello"
+x
+```
+
+* Note the difference between the `==` and `=` operators!
+* `=` is an **assignment** operator - 
+
+```{r}
+one = 1
+two = 2
+one = two
+one
+two
+```
+
+* `==` is a logical operator for **comparison** - 
+
+```{r}
+one = 1
+two = 2
+one == two
+```
+
+* Which user defined objects are currently **in memory**? The `ls` function returns a character vector with their names - 
+
+```{r, eval=FALSE}
+ls()
+```
+
+* Question: why do we write `ls()` and not `ls`?
+
+## Vectors
+
+### What is a vector?
+
+* A vector is an **ordered** collection of values of the **same type**, such as - 
+    * **Numbers** - `interger` or `numeric`
+    * **Text** - `character`
+    * **Logical** - `logical`
+* Recall that these are the same three types of constant values we saw in **Lesson 01**; in fact a constant value is a vector of length 1
+* We can create an **empty vector** using the `vector` function, specifying - 
+    * `mode` - Type
+    * `length` - Number of elements
+
+```{r}
+v = vector(mode = "numeric", length = 10)
+v
+```
+
+### The `c` function
+
+* Vectors can also be created with the `c` function, which **combines** the given vectors in the given order - 
+
+```{r}
+x = c(1, 2, 3)
+x
+```
+
+```{r}
+c(x, 5)
+```
+
+* Another example, with `character` values - 
+
+```{r}
+y = c("cat", "dog", "mouse", "apple")
+y
+```
+
+### Vector subsetting
+
+* We can access individual vector **elements** using the `[` operator and an index; in other words, to get a subset with an individual vector element -
+
+```{r}
+y[2]
+```
+
+```{r}
+y[3]
+```
+
+* Note: the index starts at `1`!
+
+* Another example - 
+
+```{r}
+counts = c(2, 0, 3, 1, 3, 2, 9, 0, 2, 1, 11, 2)
+counts[4]
+```
+
+* Components of an expression for accessing a vector element - 
+
+```{r, echo=FALSE, out.width="50%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_02_subset1.svg")
+```
+
+* We can also **assign** new values into a vector subset - 
+
+```{r}
+x = c(1, 2, 3)
+x
+```
+
+```{r}
+x[2] = 300
+x
+```
+
+* Note: in this example we made an assignment into a subset with a single element; the same way, we can make an assignment into a subset of any length (see below)
+
+### Calling functions on a vector
+
+* There are various functions for calculating vector **properties** - 
+
+```{r}
+x = c(1, 6, 3, -8, 2)
+```
+
+```{r}
+length(x)  # Number of elements
+min(x)     # Minimum
+max(x)     # Maximum
+range(x)   # Minimum, maximum
+mean(x)    # Average
+sum(x)     # Sum
+```
+
+* Other functions operate on **each** vector element, returning a vector of results having the same length as the input - 
+
+```{r, warning=FALSE}
+sqrt(x)
+```
+
+```{r}
+abs(x)
+```
+
+* Question: why does the result of the first expression contain `NaN`?
+
+### The recycling rule
+
+* Binary operations applied on two vectors are done **element-by-element**, and a vector of the results is returned - 
+
+```{r}
+c(1, 2, 3) * c(10, 20, 30)
+```
+
+* What happens when the input vector lengths do not match? The shorter vector gets **"recycled"**
+
+* For example, when one of the vectors is of length 3 and the other vector is of length 6, then the sorter (of length 3) is repeated 2 times until it matches the longer vector - 
+
+```{r}
+c(1, 2, 3)          + c(1, 2, 3, 4, 5, 6)
+```
+
+```{r}
+c(1, 2, 3, 1, 2, 3) + c(1, 2, 3, 4, 5, 6)
+```
+
+```{r, echo=FALSE, out.width="50%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_02_recycle.svg")
+```
+
+* When one of the vectors is of length 1 and the other is of length 4, the shorter vector (of length 1) is replicated 4 times - 
+
+```{r}
+2             * c(1, 2, 3, 4)
+```
+
+```{r}
+c(2, 2, 2, 2) * c(1, 2, 3, 4)
+```
+
+* When one of the vectors is of length 2 and the other is of length 4, the shorter vector (of length 2) is replicated 2 times - 
+
+```{r}
+c(10, 100)          + c(1, 2, 3, 4)
+
+```
+
+```{r}
+c(10, 100, 10, 100) + c(1, 2, 3, 4)
+
+```
+
+* When longer vector length is not a multiple of the shorter one recycling is **"incomplete"** and we get a warning message -
+
+```{r}
+c(1, 2)    * c(1, 2, 3)
+```
+
+```{r}
+c(1, 2, 1) * c(1, 2, 3)
+```
+
+* The recycling rule applies to many operators and functions, such as all arithmetic operators -
+
+```{r}
+x = c(1, 2, 3)
+y = c(4, 5, 6)
+```
+
+```{r}
+x + y
+```
+
+```{r}
+x - y
+```
+
+```{r}
+x * y
+```
+
+```{r}
+x / y
+```
+
+### Consecutive and repetitive vectors
+
+* Other than the `vector` and `c` functions, there are three commonly used methods for creating **consecutive** or **repetitive** vectors - 
+    * The `:` operator
+    * The `seq` function
+    * The `rep` function
+
+#### Consecutive vectors
+
+* The `:` operator is used to create a vector of consecutive vectors in steps of `1` or `-1` - 
+
+```{r}
+1:10   # Steps of 1
+```
+
+```{r}
+55:43  # Steps of -1
+```
+
+* The `seq` function creates a vector of consecutive values in any step size - 
+    * `from` - Where to start
+    * `to` - When to end
+    * `by` - Step size
+* For example - 
+
+```{r}
+seq(from = 100, to = 150, by = 10)
+```
+
+```{r}
+seq(from = 100, to = 80, by = -5)
+```
+
+#### Repetitive vectors
+
+* The `rep` function **replicates** its argument to create a repetitive vector - 
+    * `x` - What to replicate
+    * `times` - How many time to repeat `x`
+    * `each` - How many times to repeat each element of `x`
+
+```{r}
+rep(x = 22, times = 10)
+```
+
+```{r}
+rep(x = 22, each = 10)
+```
+
+* The `x` argument can be a vector of **length >1**
+* Note the difference between the `times` and the `each` **parameters** - 
+
+```{r}
+rep(x = c(18, 0, 9), times = 3)
+```
+
+```{r}
+rep(x = c(18, 0, 9), each = 3)
+```
+
+### Function calls
+
+* Using the `seq` function we will demonstrate three properties of function calls
+* **First**, we can omit parameter names as long as the arguments are passed in the default order - 
+
+```{r}
+seq(from = 5, to = 10, by = 1)
+```
+
+```{r}
+seq(5, 10, 1)
+```
+
+* **Second**, we can use any argument order as long as parameter names are specified - 
+
+```{r}
+seq(to = 10, by = 1, from = 5)
+```
+
+```{r}
+seq(by = 1, from = 5, to = 10)
+```
+
+```{r}
+seq(from = 5, by = 1, to = 10)
+```
+
+* **Third**, we can omit parameters that have a default value in the function definition - 
+
+```{r}
+seq(5, 10, 1)
+```
+
+```{r}
+seq(5, 10)
+```
+
+* To find out what are the parameters of a particular function, their order or their default values, we can look into the documentation - 
+
+```{r}
+# ?seq
+```
+
+### Vector subsetting
+
+* So far we created vector subsets using a `numeric` index which consists of a **single** value, such as - 
+
+```{r}
+x = c(43, 85, 10)
+x[3]
+```
+
+* We can also use a vector of **length >1** as an index - 
+
+```{r}
+x[1:2]
+```
+
+* Note that the vector does not need to be consecutive, and can include repetitions - 
+
+```{r}
+x[c(1, 1, 3, 2)]
+```
+
+* Another example - 
+
+```{r}
+counts = c(2, 0, 3, 1, 3)
+counts[1:3]
+```
+
+```{r, echo=FALSE, out.width="50%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_02_subset2.svg")
+```
+
+* Another example - 
+
+```{r}
+counts = c(2, 0, 3, 1, 3, 2, 9, 0, 2, 1, 11, 2)
+counts[c(1:3, 7:9)]
+```
+
+```{r, echo=FALSE, out.width="75%"}
+knitr::include_graphics("images/lesson_02_subset3.svg")
+```
+
+* For the next examples, let's create a vector of all **even** numbers between 1 and 100 -
+
+```{r}
+x = seq(2, 100, 2)
+x
+```
+
+* Question: what is the meaning of the numbers in square brackets when printing the vector?
+
+* How many **elements** does `x` have?
+
+```{r}
+length(x)
+```
+
+* What is the value of the **last** element in `x`?
+
+```{r}
+x[50]
+```
+
+```{r}
+x[length(x)]
+```
+
+* Question: which of the last two expressions is preferable and why?
+
+* How can we get the **entire** vector using subsetting with a `numeric` index?
+
+```{r}
+x[1:length(x)]
+```
+
+* How can we get the entire vector **except for** the last element?
+
+```{r}
+x[1:(length(x)-1)]
+```
+
+* Question: how can we get a reversed vector using a `numeric` index?
+
+* When requesting an index **beyond** vector length we get `NA` -
+
+```{r}
+x[55]
+```
+
+```{r}
+x[1:80]
+```
+
+* Reminder: `NA` is a special value meaning *Not Available*
+
+### The recycling rule
+
+* Earlier, we saw the recycling rule with **arithmetic operators**
+* The rule also applies to **assignment** - 
+
+```{r}
+counts = c(2, 0, 3, 1, 3, 2, 9, 0, 2, 1, 11, 2)
+counts[c(1:3, 7:9)]
+```
+
+```{r}
+counts[c(1:3, 7:9)] = NA
+counts
+```
+
+```{r}
+counts[c(1:3, 7:9)] = c(NA, 99)
+counts
+```
+
+### Logical vectors
+
+* The third common type of vectors are `logical` vectors
+* A **logical vector** is composed of logical values: `TRUE` and `FALSE`
+* For example - 
+
+```{r}
+c(TRUE, FALSE, FALSE)
+```
+
+```{r}
+rep(TRUE, 7)
+```
+
+* Usually, we will not be creating `logical` vectors **"manually"**, but through applying a **logical operator** on another vector -
+
+```{r}
+x = 1:5
+x
+```
+
+```{r}
+x >= 3
+```
+
+* Note how the recycling rule applies to logical operators as well
+
+* When arithmetic operations are applied to a `logical` vector, the `logical` vector is **converted** to a numeric one, where `TRUE` becomes `1` and `FALSE` becomes `0`
+* For example - 
+
+```{r}
+sum(x >= 3)
+```
+
+```{r}
+mean(x >= 3)
+```
+
+* Question: what is the meaning of the values `3` and `0.6` in the above example?
+
+* We can use a `logical` vector as an **index** for subsetting - 
+
+```{r}
+counts = c(2, 0, 3, 1, 3)
+```
+
+```{r}
+counts < 3
+```
+
+```{r}
+counts[counts < 3]
+```
+
+* The logical vector `counts<3` specifies whether **to include** each of the elements of `counts` in the resulting subset
+
+```{r, echo=FALSE, out.width="50%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_02_subset_logical.svg")
+```
+
+* Using a `logical` index - 
+
+```{r}
+x = 1:5
+```
+
+```{r}
+x[x >= 3]
+```
+
+```{r}
+x[x != 2]
+```
+
+```{r}
+x[x > 4 | x < 2]
+```
+
+```{r}
+x[x > 4 & x < 2]
+```
+
+* Question: what happened in the last expression?
+
+* The next example is slightly more complex: we select the elements of `z` whose square is larger than 8 - 
+
+```{r}
+z = c(5, 2, -3, 8)
+z[z^2 > 8]
+```
+
+* `z^2` gives a vector of squared `z` values (`2` is recycled)
+
+```{r}
+z^2
+```
+
+* Each of the squares is compared to 8 (`8` is recycled)
+
+```{r}
+z^2 > 8
+```
+
+* Finally, the latter `logical` vector is used for subsetting `z`
+
+### Missing values
+
+* The `is.na` function is used to detect **missing** (`NA`) values in a vector - 
+    * Accepts a vector of **any type**
+    * Returns a **logical** vector with `TRUE` in place of `NA` values and `FALSE` in place of non-`NA` values
+* For example -
+
+```{r}
+x = c(28, 58, NA, 31, 39, NA, 9)
+x
+```
+
+```{r}
+is.na(x)
+```
+
+* Many functions that **summarize** vector properties, such as `mean`, have the `na.rm` parameter
+* The `na.rm` parameter can be used to **exclude** `NA` values from the calculation
+* The default is `na.rm=FALSE`, meaning that `NA` values are **not** excluded
+* For example - 
+
+```{r}
+x = c(28, 58, NA, 31, 39, NA, 9)
+```
+
+```{r}
+mean(x)
+mean(x, na.rm = TRUE)
+```
+
+* Question 1: why do we get `NA` in the first expression? 
+* Question 2: what will be the result of `length(x)`?
+
+```{r}
+x = c(28, 58, NA, 31, 39, NA, 9)
+x
+```
+
+* Question: how can we replace the `NA` values in the above vector with the mean of its non-`NA` values?
+
+### The `any` and `all` functions
+
+* Sometimes we want to figure out whether - 
+    * A `logical` vector contains **at least one** `TRUE` value
+    * A `logical` vector is **entirely** composed of `TRUE` values
+* We can use the `any` and `all` functions, respectively, for that
+
+* The `any` function returns `TRUE` if **at least one** of the input vector values is `TRUE`, otherwise it returns `FALSE` - 
+
+```{r}
+x = 1:7
+x
+```
+
+```{r}
+x > 5
+any(x > 5)
+```
+
+```{r}
+x > 88
+any(x > 88)
+```
+
+* The `all` function returns `TRUE` if **all** of the input vector values are `TRUE`, otherwise it returns `FALSE` - 
+
+```{r}
+x = 1:7
+x
+```
+
+```{r}
+x > 5
+all(x > 5)
+```
+
+```{r}
+x > 0
+all(x > 0)
+```
+
+### The `which` function
+
+* The `which` function **converts** a `logical` vector to a `numeric` one with the indices of `TRUE` values
+* That way we can find out the **index** of values that satisfy a given criterion
+* For example - 
+
+```{r}
+x = c(2, 6, 2, 3, 0, 1)
+x
+```
+
+```{r}
+x > 2.3
+```
+
+```{r}
+which(x > 2.3)
+```
+
+### The `which.min` and `which.max` functions
+
+* Related functions `which.min` and `which.max` return the **index** of the (first) **minimal** or **maximal** value in a vector
+* For example - 
+
+```{r}
+x = c(2, 6, 2, 3, 0, 1, 6)
+x
+```
+
+```{r}
+which.min(x)
+```
+
+```{r}
+which.max(x)
+```
+
+* Question: how can we get **all** indices of the minimal or maximal value?
+
+## The `order` function
+
+* The `order` function returns **ordered** vector **indices**, based on the order of vector **values**
+* In other words, `order` gives the index of the smallest value, the index of the second smallest value, and so on
+
+```{r}
+x = c(2, 6, 2, 3, 0, 1, 6)
+x
+```
+
+```{r}
+order(x)
+```
+
+* We can also get the **reverse** order with `decreasing=TRUE` - 
+
+```{r}
+order(x, decreasing = TRUE)
+```
+
+* Question: how can we *sort* a vector using `order`?
+
+### The `paste` and `paste0` functions
+
+* The `paste` function is used to **"paste"** text values
+* Its `sep` parameter determines the separating character(s), with default `sep=" "`
+
+```{r}
+paste("There are", "5", "books.")
+paste("There are", "5", "books.", sep = "_")
+```
+
+* Non-character vectors are converted to `character` before pasting - 
+
+```{r}
+paste("There are", 80, "books.")
+```
+
+* The recycling rule applies in `paste` too - 
+
+```{r}
+paste("image", 1:5, ".tif", sep = "")
+```
+
+* The `paste0` function is a shortcut for `paste` with `sep=""` - 
+
+```{r}
+paste0("image", 1:5, ".tif")
+```
+
+
+
+
+

@@ -1,0 +1,630 @@
+# Processing spatio-temporal data {#processing-spatio-temporal-data}
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(fig.align = 'center', collapse = TRUE, R.options = list(width = 80))
+```
+
+## Aims
+
+* Present several characteristics of spatio-temporal data
+* Demonstrate aggregation of raster spatio-temporal data
+* Demonstrate reshaping of vector trajectory data
+
+## Spatio-temporal data
+
+### Spatio-temporal data properties
+
+* It can be argued that all data are **spatio-temporal**, since they were measured in certain **location(s)** and **time(s)**, even if the locations and times were not recorded and/or are irrelevant for analysis
+* We define spatio-temporal data as data where the locations and times of observation were **recorded** and are **relevant** for analysis
+
+* For example - 
+    * Time-series of satellite images
+    * Temperature measurements in meteorological stations over time
+    * Voting results in administrative units during several election campaigns
+    * Movement tracks of people or animals, with or without associated measurements (heart rate, activity type, etc.)
+    * Spatial pattern of epidemic disease outbreak
+    * Volcanic eruption events
+* Methods and tools for processing and analyzing spatio-temporal data are generally **less developed** than methods for working with spatial or temporal data
+
+```{r, echo=FALSE, fig.cap="Space-time dataset types", out.width="60%"}
+knitr::include_graphics("images/lesson_07_space_time1.svg")
+```
+
+https://www.jstatsoft.org/article/view/v051i07
+
+```{r, echo=FALSE, fig.cap="Grid layout: PM point measurements", out.width="90%"}
+knitr::include_graphics("images/lesson_10_spacetime_pm_points.png")
+```
+
+https://edzer.github.io/UseR2016/
+
+```{r, echo=FALSE, fig.cap="Grid layout: NDVI image time series", out.width="90%"}
+knitr::include_graphics("images/lesson_10_spacetime_raster.svg")
+```
+
+```{r, echo=FALSE, fig.cap="Irregular layout: Tweets", out.width="40%"}
+knitr::include_graphics("images/lesson_10_spacetime_tweets.svg")
+```
+
+http://onlinelibrary.wiley.com/doi/10.1111/j.1467-9671.2012.01359.x/abstract
+
+```{r, echo=FALSE, fig.cap="Irregular layout: Coral disease cases", out.width="90%"}
+knitr::include_graphics("images/lesson_10_spacetime_coral_disease.png")
+```
+
+http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0004993
+
+```{r, echo=FALSE, fig.cap="Trajectory: Flickr user paths", out.width="70%"}
+knitr::include_graphics("images/flickr_boston.svg")
+```
+
+```{r, echo=FALSE, fig.cap="Trajectory: Storm paths", out.width="90%"}
+knitr::include_graphics("images/lesson_10_storm_trajecctories.png")
+```
+
+https://www.r-spatial.org/r/2017/08/28/nest.html
+
+```{r, echo=FALSE, fig.cap="Time measurement types", out.width="75%"}
+knitr::include_graphics("images/lesson_07_space_time2.svg")
+```
+
+https://www.jstatsoft.org/article/view/v051i07
+
+```{r, echo=FALSE, fig.cap="Instance time: Earthquakes", out.width="70%"}
+knitr::include_graphics("images/lesson_10_earthquakes.png")
+```
+
+https://earthquake.usgs.gov/earthquakes/map/
+
+```{r, echo=FALSE, fig.cap="Instance, moving object time: Flickr user paths", out.width="70%"}
+knitr::include_graphics("images/flickr_boston.svg")
+```
+
+```{r, echo=FALSE, fig.cap="Consecutive intervals time: Israel borders over time", out.width="100%"}
+knitr::include_graphics("images/lesson_10_israel_borders.png")
+```
+
+http://perceptionasreality.blogspot.com/2011/05/national-borders-in-flux-1967-israel.html
+
+* **Processing** and **visualization** of spatio-temporal data are **challenging**, because of their **three-dimensional** nature
+* One of the basic approaches for working with spatio-temporal data is to **simplify** them using aggregation, in the spatial and/or temporal dimension, to help with visualization and exploratory analysis
+
+```{r, echo=FALSE, fig.cap="Pebesma 2012, JSS", out.width="90%"}
+knitr::include_graphics("images/lesson_10_spacetime_jss_paper.png")
+```
+
+https://www.jstatsoft.org/article/view/v051i07
+
+### Aggregation of spatio-temporal raster data
+
+* Let's go back to the `modis_south.tif` raster
+
+```{r}
+library(stars)
+
+r = read_stars("data/MOD13A3_2000_2019.tif")
+```
+
+* And also load the associated `dates.csv` table - 
+
+```{r}
+library(dplyr)
+
+dates = read.csv("data/MOD13A3_2000_2019_dates.csv", stringsAsFactors = FALSE)
+dates$date = as.Date(dates$date)
+dates$month = as.numeric(format(dates$date, "%m"))
+tab = data.frame(
+  month = c(12, 1:11),
+  season = rep(c("winter","spring","summer","fall"), each = 3),
+  stringsAsFactors = FALSE
+)
+dates = left_join(dates, tab, by = "month")
+```
+
+```{r}
+head(dates)
+```
+
+* To **aggregate** the raster on the temporal dimension, we need to - 
+    * Select **subsets** of raster layers (e.g. seasons)
+    * Apply an **overlay** function to summarize each subset into a single layer (e.g. mean)
+* However, we can select layers only based on layer **numbers** or layer **names**, *not* based on a **logical** vector
+
+* Subset of raster layers using a `numeric` vector (of layer indices):
+
+```{r}
+# r[[3:4]]
+```
+
+* Subset of raster layers using a `character` vector (of layer names) - 
+
+```{r}
+# r[[c("modis_south.3", "modis_south.4")]]
+```
+
+* Subset of raster layers using a `logical` vector - 
+
+```{r}
+r[,,,dates$month == 1]
+```
+
+* Question 1: how can we create a subset of `modis_south.tif` with just the images taken during spring?
+* Question 2: how can we then calculate the "average" spring NDVI image?
+
+* Now, let's use the same method to create a **seasonal** summary of average NDVI images, including each of the **four** seasons
+* We would like to create a raster named `season_means`, having **4 layers**, where each layer is the average NDVI per season - 
+    * `"winter"`
+    * `"spring"`
+    * `"summer"`
+    * `"fall"`
+* The averages will ignore `NA` values
+* We can combine the average layers using the `stack` function
+
+* Function for calculating mean, with `NA`'s excluded -
+
+```{r}
+f = function(x) mean(x, na.rm = TRUE)
+```
+
+* Vector of season names -
+
+```{r}
+seasons = c("winter", "spring", "summer", "fall")
+```
+
+* Empty `RasterStack` object -
+
+* For each season we -
+    * **Subset** layers
+    * **Calculate** mean
+    * **Add** result to the `season_means` object
+
+```{r}
+season_means = list()
+for(i in seasons) {
+  v = which(dates$season == i)
+  s = r[,,,v]
+  season_means[[i]] = st_apply(s, 1:2, mean, na.rm = TRUE)
+}
+season_means = do.call(c, season_means)
+season_means = st_redimension(season_means)
+names(season_means) = "NDVI"
+```
+
+* And use the `levelplot` function from `rasterVis` to **display** the result - 
+
+```{r, out.width="100%", fig.cap="Average NDVI per season"}
+plot(season_means)
+```
+
+* In case we need to summarize the seasonal NDVI in a **different way**, all we have to do is replace the **aggregation function** `f`
+* For example, we can decide to have `NA` instead of less reliable pixels where >25% of values are missing
+* Instead of the previous function - 
+
+```{r}
+f = function(x) mean(x, na.rm = TRUE)
+```
+
+* We use a new definition - 
+
+```{r}
+f_NA = function(x) {
+  if(mean(is.na(x)) > 0.25)
+    return(NA)
+  else
+    return(mean(x, na.rm = TRUE))
+}
+```
+
+```{r}
+season_means = list()
+for(i in seasons) {
+  v = which(dates$season == i)
+  s = r[,,,v]
+  season_means[[i]] = st_apply(s, 1:2, f_NA)
+}
+season_means = do.call(c, season_means)
+season_means = st_redimension(season_means)
+names(season_means) = "NDVI"
+```
+
+```{r, out.width="100%", fig.cap="Average NDVI per season, pixels with >25\\% `NA` excluded"}
+plot(season_means)
+```
+
+* Our second example is aggregation in **just one** of the spatial dimensions
+* In this case, we will summarize the **west-east** gradient (i.e. a raster row) into a single value
+* That way, we will be able to visualize the **north-south** gradient over **time**
+* First, we will define a function named `raster_rowMeans` which **accepts** -
+    * A raster 
+    * A layer number
+* and **returns** the vector of **row means** of the specified layer (ignoring `NA`s)
+
+```{r}
+# raster_rowMeans = function(x, layer) {
+  # rowMeans(as.matrix(x[[layer]]), na.rm = TRUE)
+# }
+```
+
+* Using this function we can observe the **north-south** NDVI gradient for specified points in time
+
+```{r}
+x = st_apply(r[,,,1], 1, mean, na.rm = TRUE)[[1]]   # Winter
+y = st_apply(r[,,,7], 1, mean, na.rm = TRUE)[[1]]   # Summer
+```
+
+* Plot - 
+
+```{r, out.width="90%", fig.cap="North-south NDVI gradient in two different dates: a winter day (blue) and a summer day (red)"}
+plot(x, type = "l", col = "blue")
+lines(y, col = "red")
+```
+
+* Next we will create a raster `s`, where each **column** will contain the row means of one **layer** of `r`
+
+```{r, echo=FALSE, fig.cap="Raster row means", out.width="100%"}
+knitr::include_graphics("images/lesson_10_row_means.svg")
+```
+
+* Raster `s` needs to have - 
+    * The same number of **rows** as `r`
+    * As **many** columns as `r` **layers**
+
+```{r}
+# s = raster(
+#   nrows = nrow(r), 
+#   ncols = nlayers(r), 
+#   xmn = 0, 
+#   xmx = nlayers(r), 
+#   ymn = 0, 
+#   ymx = nrow(r)
+# )
+```
+
+* Once the `s` template is ready, we can calculate the values within a `for` loop
+* Each **column** in `s` gets the **row means** of a layer in `r` -
+
+```{r}
+r = read_stars("data/MOD13A3_2000_2019.tif")
+r = st_warp(r, crs = 32636)
+pol = st_read("data/nafot.shp")
+pol = st_buffer(pol, 10)
+pol = st_union(pol)
+pol = st_transform(pol, 32636)
+r = r[pol]
+s = st_apply(r, c(1, 3), mean, na.rm = TRUE)
+s = st_set_dimensions(s, "x", values = dim(r)["x"]:1)
+s = st_set_dimensions(s, "band", names = "y", values = 1:dim(r)["band"])
+s = st_set_dimensions(s, xy = c("y", "x"))
+```
+
+Plot:
+
+```{r, out.width="100%", fig.cap="Row means of `r` over time"}
+plot(s)
+```
+
+## Lists
+
+### The `list` class
+
+* A `list` is a **collection** of objects of **any** class
+* There are no restrictions as for the **class** and **dimensions** of each list element
+* Lists are therefore the most **flexible** of the base R data structures
+
+* A list can be **created** with the `list` function - 
+
+```{r}
+x = list(c(1, 3), c(4, 5, 6), 8)
+```
+
+```{r}
+x
+```
+
+* List **indices** are marked with `[[`, followed by element contents 
+
+* List elements can be named using `names` -
+
+```{r}
+names(x)
+```
+
+```{r}
+names(x) = c("a", "b", "c")
+```
+
+```{r}
+x
+```
+
+### List subsetting
+
+* The `[` operator gives a `list` **subset**, as a **new list** - 
+
+```{r}
+x[1:2]
+```
+
+```{r}
+x[1]
+```
+
+* The `[[` and `$` operators give the **contents** of a **single** `list` element - 
+
+```{r}
+x[[2]]
+```
+
+```{r}
+x$b
+```
+
+```{r, echo=FALSE, fig.cap="Subsetting a `list` using the `[` and `[[` operators", out.width="100%"}
+knitr::include_graphics("images/lesson_10_pepper.svg")
+```
+
+http://r4ds.had.co.nz/vectors.html
+
+### The `lapply` function
+
+* The `lapply` function "splits" a `list` to individual elements
+* Calls a function on each element
+* Combines the results to a new list
+
+```{r, echo=FALSE, fig.cap="`apply` and `lapply`", out.width="100%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_10_apply_vs_lapply.svg")
+```
+
+```{r}
+lapply(x, mean)
+lapply(x, range)
+lapply(x, is.na)
+```
+
+### The `split` function
+
+* The `split` function can **split** a `data.frame` to a `list` of smaller `data.frame`s, according to **unique** values of the given vector
+
+```{r, echo=FALSE, fig.cap="The `split` function", out.width="50%"}
+knitr::include_graphics("images/lesson_10_split.svg")
+```
+
+```{r}
+dat = data.frame(
+  y = c(3, 5, 1, 4, 5),
+  g = c("f", "m", "f", "f", "m"), 
+  stringsAsFactors = FALSE
+)
+```
+
+```{r}
+dat
+```
+
+```{r}
+dat_s = split(dat, dat$g)
+```
+
+```{r}
+dat_s
+```
+
+### The `do.call` function
+
+* The `do.call` function can be used to pass a `list` of function **arguments** to a function
+* The following two expressions are **equivalent** - 
+
+```{r, eval=FALSE}
+f(a, b, c, d)
+```
+
+```{r, eval=FALSE}
+do.call(f, list(a, b, c, d))
+```
+
+* `do.call` is useful when we want to call a function with a **large** or **variable** number of arguments - as `list` elements - without having to specify their **names**
+
+* For example - 
+
+```{r}
+c(x[[1]], x[[2]], x[[3]])
+```
+
+```{r}
+do.call(c, x)
+```
+
+## Processing trajectory data
+
+### Dataset: Storm trajectories
+
+* As an example of how `list`s, `split` and `do.call` can be useful when working with **spatial data**, we will create a line layer from a table of point observations `storms` - 
+
+```{r}
+storms = as.data.frame(storms)
+vars = c(
+  "name", "year", "month", "day", "hour", 
+  "long", "lat"
+)
+storms = storms[, vars]
+```
+
+* The dataset contains **storm location** info at consecutive points over time - 
+
+```{r}
+head(storms)
+```
+
+### Setting storm IDs
+
+* To distinguish between individual storm tracks we can create a unique **ID** variable
+* Storm name is not unique - there are storms of the same name in different years
+
+```{r}
+x = paste(storms$name, storms$year)
+x = unique(sort(x))
+tail(x)
+```
+
+* We could create an ID that combines **year** and **storm name**... 
+* However a storm can span over two different years!
+
+```{r}
+head(storms[storms$name == "Zeta", ], 10)
+```
+
+* We need a unique ID for each **consecutive sequence** of storm names, assuming that no two consecutive storms will be given the same name, using function `rleid` from `data.table`
+
+```{r}
+library(data.table)
+
+storms$id = rleid(storms$name)
+```
+
+```{r}
+head(storms)
+```
+
+### To points
+
+* The table can be converted to a **point layer** with `st_as_sf` using the `long` and `lat` columns -
+
+```{r}
+library(sf)
+
+pnt = st_as_sf(
+  storms, 
+  coords = c("long", "lat"), 
+  crs = 4326
+)
+```
+
+```{r}
+pnt
+```
+
+* Plot:
+
+```{r, fig.width=7, fig.height=4, out.width="100%", fig.cap="The `storms` points"}
+plot(pnt)
+```
+
+### Points to lines
+
+* How can we go from a **point** layer to a **line** layer?
+    * **Select** all points of the same storm
+    * **Order** by time, earliest to latest
+    * **Merge** point to a line
+    * **Repeat** for all storms in the point layer
+
+* We **split** the point layer by storm **ID** - 
+
+```{r}
+lines = split(pnt, pnt$id)
+```
+
+### Trajectory data
+
+```{r}
+lines[1]
+```
+
+* Ordering the points, or making sure they are aready ordered, is essential to connect storm track points in **chronological order** -
+
+```{r}
+f = function(x) x[order(x$year, x$month, x$day, x$hour), ]
+lines = lapply(lines, f)
+```
+
+```{r, fig.width=7, fig.height=4, out.width="100%", fig.cap="The `storms` points"}
+plot(lines[[1]])
+```
+
+* Then, we **combine** all `POINT` geometries to a single `MULTIPOINT` geometry
+* Note: `st_combine` combines geometries without dissovling borders (unlike `st_union`)
+
+```{r}
+lines = lapply(lines, st_combine)
+```
+
+```{r}
+lines[1]
+```
+
+```{r, fig.width=7, fig.height=4, out.width="100%", fig.cap="The `storms` points"}
+plot(lines[[1]])
+```
+
+* Now the `MULTIPOINT` can be **cast** to `LINESTRING` - 
+
+```{r}
+lines = lapply(lines, st_cast, "LINESTRING")
+```
+
+```{r}
+lines[1]
+```
+
+```{r, fig.width=7, fig.height=4, out.width="100%", fig.cap="The `storms` points"}
+plot(lines[[1]])
+```
+
+* We have a `list` of **individual** `LINESTRING` geometries
+* The list can be **combined** back to an `sfc` geometry column with `do.call` - 
+
+```{r}
+geometry = do.call(c, lines)
+```
+
+```{r}
+geometry
+```
+
+```{r, fig.width=7, fig.height=4, out.width="100%", fig.cap="The `storms` points"}
+plot(geometry)
+```
+
+* To attach storm **IDs** back to the geometries, we can rely on the fact that feature order was kept intact - 
+
+```{r}
+attr = data.frame(
+  id = names(lines), 
+  stringsAsFactors = FALSE
+)
+```
+
+```{r}
+head(attr)
+```
+
+```{r}
+lines = st_sf(geometry, attr)
+lines
+```
+
+```{r, fig.width=7, fig.height=4.5, out.width="100%", fig.cap="The `storms` line layer"}
+plot(lines)
+```
+
+* Overall distance that each storm has traveled - 
+
+```{r}
+lines$length = st_length(lines)
+lines
+```
+
+```{r, fig.width=7, fig.height=4.5, out.width="100%", fig.cap="The `storms` line layer, with length"}
+plot(lines[, "length"])
+```
+
+
+
+
+
+
+
+
+
+
+

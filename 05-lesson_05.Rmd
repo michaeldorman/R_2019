@@ -1,0 +1,765 @@
+# Matrices and rasters {#matrices-and-rasters}
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(fig.align = 'center', collapse = TRUE, R.options = list(width = 80))
+```
+
+## Aims
+
+* We start working with spatial data (rasters)
+* Introducing the basic `matrix` and `array` data structures, and their analogous spatial data structures - single band rasters and multi-band rasters, respectively
+* Learn about accessing the values and properties of rasters
+* Learn to read and write raster data
+
+## Matrices
+
+A `matrix` is a **two-dimensional** collection of values of the **same type** (like a vector), where the number of values in all rows is equal. It is important to know how to work with matrices because:
+
+* It is a commonly used structure with many uses in data processing
+* Many R function accept a `matrix` as an argument (e.g. `focal`)
+* Many R functions return a `matrix` (e.g. `extract`)
+
+### Creating a `matrix`
+
+A `matrix` can be created with the `matrix` function. The `matrix` function accepts the following parameters:
+
+* `data` - A vector of the **values** to fill into the matrix
+* `nrow` - The number of **rows**
+* `ncol` - The number of **columns**
+* `byrow` - Whether the matrix is filled **by row** (`TRUE`) or **by column** (`FALSE`, the default)
+
+For example:
+
+```{r}
+matrix(1:6, ncol = 3)
+```
+
+The `nrow` and `ncol` parameters determine the number of rows and number of columns, respectively:
+
+```{r}
+matrix(1:6, nrow = 3)
+matrix(1:6, ncol = 3)
+```
+
+```{r}
+matrix(1:6, nrow = 2)
+matrix(1:6, ncol = 2)
+```
+
+> Question 1: create a `matrix` with 3 rows and 4 columns which contains the numbers 12-1 in decreasing order, such as the one printed below. 
+
+```{r, echo=FALSE}
+matrix(12:1, ncol = 4)
+```
+
+> Question 2: what do you think will happen when we try to create a matrix with less or more `data` values than matrix size `nrow*ncol`? Run the following expressions to find out. 
+
+```{r, eval=FALSE}
+matrix(12:1, ncol = 4, nrow = 2)
+matrix(12:1, ncol = 4, nrow = 4)
+```
+
+> Question 3: create a 3×3 matrix where all values are 1/9. 
+
+### Matrix properties
+
+The `length` function returns the number of values in a `matrix`:
+
+```{r}
+x = matrix(1:6, ncol = 3)
+x
+```
+
+```{r}
+length(x)
+```
+
+The `nrow` and `ncol` functions return the number of rows and columns in a `matrix`, respectively:
+
+```{r}
+x = matrix(1:6, ncol = 3)
+x
+```
+
+```{r}
+nrow(x)
+```
+
+```{r}
+ncol(x)
+```
+
+For example, the built-in `matrix` named `volcano` contains elevation data. Let's check its dimensions:
+
+```{r}
+nrow(volcano)
+```
+
+```{r}
+ncol(volcano)
+```
+
+```{r}
+length(volcano)
+```
+
+The `dim` function gives both **dimensions** of the `matrix` as a vector of length 2, i.e. number of rows and columns, respectively:
+
+```{r}
+x = matrix(1:6, ncol = 3)
+x
+```
+
+```{r}
+dim(x)
+```
+
+The `rownames` and `colnames` functions return the **row names** and **column names**, respectively. The row and column names can also be modified by assignment to these properties:
+
+```{r}
+x = matrix(1:6, ncol = 3)
+x
+```
+
+```{r}
+rownames(x) = c("A", "B")
+x
+```
+
+### Matrix to vector conversion
+
+The `as.vector` function converts a `matrix` to a vector:
+
+```{r}
+x = matrix(1:6, ncol = 3, byrow = TRUE)
+x
+```
+
+```{r}
+as.vector(x)
+```
+
+Note that `matrix` values are always arranged by column!
+
+### Matrix to `data.frame` conversion
+
+The `as.data.frame` function converts a `matrix` to a table: 
+
+```{r}
+x = matrix(1:6, ncol = 3)
+x
+```
+
+```{r}
+as.data.frame(x)
+```
+
+### Transposing a matrix
+
+The `t` function transposes a `matrix`, i.e., it flips the rows and columns:
+
+```{r}
+x = matrix(1:6, ncol = 3)
+x
+```
+
+```{r}
+t(x)
+```
+
+> Question: what will be the result of `t(t(x))`?
+
+### Image with contours
+
+Using the `image` and `contour` functions we can graphically display `matrix` values. The color scale can be set with `col` and the x/y **aspect ratio** can be set with `asp`. Also, `add=TRUE` is use in the `contour` function call so that the contour is added on top of the existing plot rather than initiated in a new plot. The resulting images is shown in Figure \@ref(fig:volcano-contour).
+
+```{r volcano-contour, fig.cap="Volcano image with contours"}
+image(volcano, col = terrain.colors(30), asp = ncol(volcano) / nrow(volcano))
+contour(volcano, add = TRUE)
+```
+
+### Matrix subsetting
+
+Similarly to what we learned about `data.frame`, `matrix` indices are two-dimensional. The first value refers to *rows* and the second value refers to *columns*:
+
+```{r}
+x = matrix(1:6, ncol = 3)
+x
+```
+
+```{r, error=TRUE}
+x[2, 1]
+x[1, 3]
+x[4, 4]
+```
+
+Here is another example:
+
+```{r}
+volcano[20, 40]  # Row 20, column 40
+```
+
+```{r}
+volcano[81, 61]  # Row 81, column 61
+```
+
+```{r}
+volcano[1, 5]    # Row 1, column 5
+```
+
+Complete rows or columns can be accessed by leaving a blank space instead of the row or column index. By default, a subset that comes from a single row or a single column is **simplified** to a vector: 
+
+```{r}
+x
+```
+
+```{r}
+x[2, ]
+```
+
+```{r}
+x[ ,2]
+```
+
+To "suppress" the simplification of individual rows/columns to a vector, we can use the `drop=FALSE` argument:
+
+```{r}
+x
+```
+
+```{r}
+x[2, , drop = FALSE]
+```
+
+```{r}
+x[, 2, drop = FALSE]
+```
+
+* When referring to an elevation matrix such as `volcano`, a row or column is actually an elevation **profile**
+* For example - 
+
+```{r}
+r30 = volcano[30, ]
+r70 = volcano[70, ]
+```
+
+* Plot - 
+
+```{r, fig.cap="Rows 30 (blue) and 70 (red) from the `volcano` matrix", fig.width=7, fig.height=5, out.width="100%"}
+plot(
+  r30,
+  type = "o", 
+  col = "blue", 
+  ylim = range(c(r30, r70)),
+  xlab = "Column",
+  ylab = "Elevation (m)"
+)
+lines(
+  r70, 
+  type = "o", 
+  col = "red"
+)
+```
+
+```{r, echo=FALSE, fig.cap="Rows 30 and 70 in the `volcano` matrix", out.width="100%"}
+volcano[30, ] = min(volcano)
+volcano[70, ] = min(volcano)
+
+z = 2 * volcano
+x = 10 * (1:nrow(z))
+y = 10 * (1:ncol(z))
+
+z0 = min(z) - 20
+z = rbind(z0, cbind(z0, z, z0), z0)
+x = c(min(x) - 1e-10, x, max(x) + 1e-10)
+y = c(min(y) - 1e-10, y, max(y) + 1e-10)
+
+fill = matrix("green3", nr = nrow(z)-1, nc = ncol(z)-1)
+i2 = c(1,ncol(fill))
+i1 = c(1,nrow(fill))
+fill[ , i2] = "gray"
+fill[i1 , ] = "gray"
+
+fcol = fill
+zi = volcano[ -1,-1] + volcano[ -1,-61] +
+           volcano[-87,-1] + volcano[-87,-61]  
+fcol[-i1,-i2] =
+    terrain.colors(20)[cut(zi, quantile(zi, seq(0,1, len = 21)),
+                           include.lowest = TRUE)]
+
+par(mar=rep(0,4))
+persp(x, y, 2*z, theta = 110, phi = 40, col = fcol, scale = FALSE,
+      ltheta = -120, shade = 0.4, border = NA, box = FALSE)
+data(volcano)
+```
+
+* We can also use vectors of **length >1** when subsetting - 
+
+```{r}
+x = matrix(1:6, ncol = 3)
+x
+```
+
+```{r}
+x[, 1:2]
+```
+
+* We can also use vectors of **length >1** when subsetting - 
+
+```{r}
+x = matrix(1:6, ncol = 3)
+x
+```
+
+```{r}
+x[2, c(1,3)]
+```
+
+```{r}
+x[2, c(1,3), drop = FALSE]
+```
+
+* We can **assign** new values to subsets of a `matrix` - 
+
+```{r}
+m = matrix(NA, ncol = 3, nrow = 3)
+```
+
+```{r}
+m[2:3, 1:2] = 1
+m
+```
+
+```{r}
+m[1:2, 2:3] = 100
+m
+```
+
+### Summarizing rows and columns
+
+How can we calculate the row or column means of a matrix? One way is to use a `for` loop, as follows:
+
+```{r}
+result = rep(NA, nrow(volcano))
+for(i in 1:nrow(volcano)) {
+  result[i] = mean(volcano[i, ])
+}
+```
+
+The resulting vector of *row means* can be visualized as follows (Figure \@ref(fig:volcano-row-means)):
+
+```{r volcano-row-means, fig.cap="Row means of `volcano`"}
+plot(result, xlab = "Row", ylab = "Elevation (m)")
+```
+
+> What changes do we need to make in the code to calculate *column* means?
+
+```{r, echo=FALSE, fig.cap="Row means of the `volcano` matrix", fig.width=7, fig.height=5, out.width="100%"}
+plot(result, xlab = "Row", ylab = "Elevation (m)")
+```
+
+* A **shorter** way to do the same with `apply` - 
+
+```{r}
+result = apply(volcano, 1, mean)
+```
+
+* For the special cases of `mean` there are further **shortcuts** `rowMeans` and `colMeans` - 
+
+```{r}
+result = rowMeans(volcano)
+```
+
+* Note: in both cases we can use `na.rm` to determine whether `NA` values are included in the calculation (default is `FALSE`)
+
+* Question 1: does the `volcano` matrix contains `NA`s? How can we make sure?
+* Question 2: how can we check whether the above two expressions give exactly the same result?
+
+## Arrays
+
+* An **array** is a data structure that contains values of the **same type** and can have any number of **dimensions**
+* We may consider a vector (1 dimension) and a `matrix` (2 dimensions) as **special cases** of an array
+
+* An `array` object can be **created** with the `array` function, specifying the values and the required dimensions - 
+
+```{r}
+y = array(1:24, c(2, 3, 4))
+```
+
+```{r, echo=FALSE, fig.cap='An `array` with 2 rows, 3 columns and 4 "layers"', out.width="25%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_05_array.svg")
+```
+
+```{r, echo=FALSE, size="scriptsize"}
+y
+```
+
+* Arrays subsetting - 
+
+```{r}
+y[1, , ]  # 1st dimension
+```
+
+```{r, echo=FALSE, fig.cap="`array` subsetting", out.width="70%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_05_array_subset1.svg")
+```
+
+* Arrays subsetting - 
+
+```{r}
+y[, 1, ]  # 2nd dimension
+```
+
+* Arrays subsetting - 
+
+```{r}
+y[, , 1]  # 3rd dimension
+```
+
+* Arrays subsetting - 
+
+```{r}
+y[1, 1, ]  # Dimensions 1 & 2
+```
+
+```{r, echo=FALSE, fig.cap="`array` subsetting", out.width="100%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_05_array_subset2.svg")
+```
+
+* Arrays subsetting - 
+
+```{r}
+y[1, , 1]  # Dimensions 1 & 3
+```
+
+* Arrays subsetting - 
+
+```{r}
+y[, 1, 1]  # Dimensions 2 & 3
+```
+
+* Arrays subsetting - 
+
+```{r}
+y[1, 1, 1]  # Dimensions 1 & 2 & 3
+```
+
+* When using `apply` on a 3-dimensional `array`, we can apply a function - 
+    * On **one** of the dimensions
+    * On a combinations of any **two** dimensions - 
+
+```{r}
+apply(y, 1, mean)    # Row means
+```
+
+```{r}
+apply(y, 2, mean)    # Column means
+```
+
+```{r}
+apply(y, 3, mean)    # 'Layer' means
+```
+
+```{r}
+apply(y, 1:2, mean)  # Row/Column combination means
+```
+
+## Basic data structures in R
+
+* We can classify the basic **data structures** in R based on - 
+    * **Dimensions** - `1`, `2` or `n` (note there is no `0`)
+    * **Homogeneity** - homogeneous (values of the same type) or heterogeneous (values of different types)
+* Most of the data structures in R are **combinations** of the basic five ones
+
+| | homogeneous | heterogeneous |
+|---|---|---|
+| one-dimensional | vector | `list` |
+| two-dimensional | `matrix` | `data.frame` |
+| n-dimensional | `array` | |
+
+Table: Five basic data structures in R
+
+## Rasters {#rasters}
+
+### What is a raster?
+
+A raster is basically a matrix or an array, representing a rectangular area on the surface of the earth. To associate the matrix or the array with the particular area it represents, the raster has some additional *spatial* properties on top of the ordinary *non-spatial* properties that an ordinary matrix or array has:
+
+* **Non-spatial** properties
+    * Values
+    * Dimensions (rows, columns, layers)
+* **Spatial** properties
+    * Extent 
+    * (Resolution)
+    * Coordinate Reference System (CRS)
+
+```{r, echo=FALSE, fig.cap="Raster cells^[http://desktop.arcgis.com/en/arcmap/10.3/manage-data/raster-and-images/what-is-raster-data.htm]", out.width="45%"}
+knitr::include_graphics("images/lesson_05_raster_esri.png")
+```
+
+### Raster file formats
+
+* "Simple" rasters
+    * **GeoTIFF** (`.tif`)
+    * **Erdas Imagine Image** (`.img`)
+* "Complex" rasters (>3D and / or metadata)
+    * **HDF** (`.hdf`)
+    * **NetCDF** (`.nc`)
+
+```{r, fig.cap="Structure of an HDF file^[http://matthewrocklin.com/blog/work/2018/02/06/hdf-in-the-cloud]", echo=FALSE, out.width="100%"}
+knitr::include_graphics("images/HDF_structure.png")
+```
+
+```{r, echo=FALSE, fig.cap="Single-band and multi-band raster^[https://datacarpentry.org/organization-geospatial/]", out.width="60%"}
+knitr::include_graphics("images/lesson_05_raster_single_band_vs_multi_band.png")
+```
+
+### Raster data structures in package `raster`
+
+The `raster` package contains classes and functions for working with rasters in R. The most important three classes from `raster` are the ones for representing rasters:
+
+* `RasterLayer` for *single-band* rasters
+* `RasterStack` and `RasterBrick` for *multi-band* rasters^[These classes are both used to represent multi-band rasters. They differ only in their internal structure.].
+
+### The `stars` class
+
+The `stars` package contains the `stars` class for representing rasters, and functions for working with rasters in R. A `stars` object is basically a list of arrays with a metadata table describing dimensions. Don't worry if this is not clear: this will be 
+
+### Reading raster from file
+
+The most common an useful method for creating a raster object in R (and elsewhere) is reading from a file, such as a GeoTIFF file. We can use the `read_stars` function to read a GeoTIFF file and create a `stars` object in R. The first parameter (`.x`) is the file path to the file we want to read, or just the file name (when the file is located in the working directory).
+
+As an example, the `dem.tif` file contains a Digital Elevation Model (DEM) of the area around Haifa. First, we have to loads the `stars` package:
+
+```{r}
+library(stars)
+```
+
+Then we can use the `read_stars` function to read the file:
+
+```{r}
+s = read_stars("data/dem.tif")
+```
+
+Note: GeoTIFF files can come with both `*.tif` and `*.tiff` file extension, so if one of them does not work you should try the other. 
+
+### Visualization with `mapview` and `cubeview`
+
+The simplest way to visualize a `stars` object is simply to use the `plot` function. This produces a static image of the raster, such as the one shown in Figure \@ref(fig:dem-raster-plot). 
+
+```{r dem-raster-plot, out.width="70%", fig.cap="Raster plot"}
+plot(s)
+```
+
+The `mapview` function from package [`mapview`](https://r-spatial.github.io/mapview/index.html) lets us visually examine spatial objects—vector layers or rasters—in an interactive map on top of various background layers, such as OpenStreetMap, satellite images, etc. For example:
+
+-----
+
+```{r}
+library(mapview)
+mapview(as(s, "Raster"), layer.name = "elevation", legend = TRUE)
+```
+
+-----
+
+Note that we had to convert the raster to a different class from the `raster` package, using:
+
+```{r}
+as(s, "Raster")
+```
+
+This is necessary because `mapview` (and `cubeview`, below) are not yet fully compatible with `stars`. 
+
+The file `MOD13A3_2000_2019.tif` is a multi-band raster with monthly NDVI values in Israel, for the period 2000-02-01 to 2019-06-01 from the MODIS instrument on the Terra satellite. Uncertain values were replaced with `NA`. Let's try reading this file to create a `stars` object in the R environment. 
+
+```{r}
+r = read_stars("data/MOD13A3_2000_2019.tif")
+```
+
+Another useful package for examining rasters, especially multi-band ones, is [`cubeview`](https://github.com/r-spatial/cubeview):
+
+```{r, eval=FALSE}
+library(cubeview)
+cubeview(as(r, "Raster"))
+```
+
+### Raster values and properties
+
+The `print` method for raster objects gives a **summary** of their properties:
+
+```{r}
+s
+```
+
+The `class` function returns the class name, which is `stars` in this case:
+
+```{r}
+class(s)
+```
+
+As we've seen in Chapter \@ref(the-r-environment), a class is a "template" with pre-defined properties that each object of that class has. For example, a `stars` object is actially an `array` with additional properties, such as dimension names, Coordinate Reference Systems (CRS), etc. When we read the `dem.tif` file with `read_stars`, the information regarding all of the properties was transferred from the file and into the `stars` "template". Now, the `stars` object named `s` is in the RAM, filled with the specific values from `dem.tif`. 
+
+* We can display the structure of the `stars` object with the specific values with `str` - 
+
+```{r}
+str(s)
+```
+
+In many cases we do not need to look for the property values by directly accessing object components. Instead, we are using accessor functions and methods defined for the class. For example, the following functions return various properties related to raster dimensions:
+
+```{r}
+nrow(s)
+ncol(s)
+dim(s)
+names(s)
+```
+
+`stars` objects are collections of arrays with identical dimensions. Each array is associated with a name. These are not part of a GeoTIFF file, and therefore automatically give *default* values based on file name: 
+
+```{r}
+names(s)
+```
+
+We can change the attribute names through assignment. For example, it makes sense to name the attribute after the physical property or measurement it represents:
+
+```{r}
+names(s) = "elevation"
+names(s)
+```
+
+Accessing an attrubute, by name or by numeric index, returns the `matrix` (single-band raster) or `array` (multi-band raster) object with the values of that attribute. For example, here we access the `elevation` attribute by name:
+
+```{r}
+class(s$elevation)
+dim(s$elevation)
+```
+
+And here we do the same using a numeric index and the `[[` operator:
+
+```{r}
+class(s[[1]])
+dim(s[[1]])
+```
+
+The *spatial* properties, determining raster placement in geographical space, include:
+
+* Resolution
+* Extent
+* Coordinate Reference System (CRS)
+
+```{r}
+st_dimensions(s)[["x"]]$offset
+st_dimensions(s)[["y"]]$offset
+st_dimensions(s)[["x"]]$delta
+st_dimensions(s)[["y"]]$delta
+```
+
+```{r}
+st_bbox(s)
+```
+
+```{r}
+st_crs(s)
+```
+
+A **histogram** can give a first impression of the raster values distribution:
+
+```{r, fig.cap="Distribution of elevation values"}
+hist(s[[1]])
+```
+
+Question: find out the mean, minimum and maximum values of the raster `r` (excluding `NA`s)
+
+```{r, echo=FALSE}
+mean(s[[1]], na.rm = TRUE)
+min(s[[1]], na.rm = TRUE)
+max(s[[1]], na.rm = TRUE)
+```
+
+Raster values can be accessed directly using the array notation:
+
+```{r}
+s[[1]]
+```
+
+Note that the array is reversed!
+
+We can take a subset of values:
+
+```{r}
+s[[1]][15:16, 7:9]
+```
+
+We can also assign new values into the subset. For example:
+
+```{r}
+s[[1]][15:16, 7:9] = NA
+s[[1]]
+```
+
+```{r}
+plot(s, text_values = TRUE)
+```
+
+Or:
+
+```{r}
+s[[1]] = s[[1]] * 2
+s[[1]]
+```
+
+```{r}
+plot(s, text_values = TRUE)
+```
+
+We can even replace the entire array of values with a custom one:
+
+```{r}
+m = matrix(1:length(s[[1]]), nrow = ncol(s), ncol = nrow(s))
+m
+s[[1]] = t(m)
+s[[1]]
+```
+
+```{r}
+plot(s, text_values = TRUE)
+```
+
+### The NetCDF format
+
+```{r}
+u = read_stars("data/MOD13A3.A2000032.h20v05.006.2015138123528.hdf")
+u
+```
+
+### Using `stars_proxy` objects
+
+...
+
+### Writing raster to file
+
+Writing a `stars` raster object to a file on disk is done using `write_stars`. We need to specify: 
+
+* `obj` - The `stars` object to write
+* `dsn` - The file name to write
+
+The function can automatically detect the required file format based on the file extension. For example, the following expression writes the `stars` object named `s` to a GeoTIFF file named `dem.tif`:
+
+```{r}
+write_stars(s, "data/dem_copy.tif")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

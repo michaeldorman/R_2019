@@ -1,0 +1,868 @@
+# Tables, conditionals and loops {#tables-conditionals-and-loops}
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(fig.align = 'center', collapse = TRUE, R.options = list(width = 80))
+```
+
+## Aims
+
+* Learn to work with `data.frame`, the data structure used to represent tables in R
+* Learn several automation methods for controlling code execution and automation in R - 
+    * Conditionals
+    * Loops
+    * The `apply` function
+* Install and use packages beyond "base R"
+* Join between tables
+
+## Tables
+
+### What is a table?
+
+* A **table** in R is represented using the `data.frame` class
+* A `data.frame` is basically a collection of **vectors** comprising columns, all of the **same size** but possibly of **different types**
+* Conventionally - 
+    * Each row represents an **observation**, with values possibly of a **different** type for each variable
+    * Each column represents a **variable**, with values of the **same** type
+
+```{r, echo=FALSE, fig.cap="\\texttt{rainfall.csv} opened in Excel", out.width="100%"}
+knitr::include_graphics("images/lesson_04_table_in_excel.png")
+```
+
+### Creating a `data.frame`
+
+* A `data.frame` can be **created** with the `data.frame` function, given one or more vectors which become columns
+* The `stringAsFactors=FALSE` argument *prevents* the conversion of **text columns** to `factor`, which is what we usually want
+
+```{r}
+d = data.frame(
+  num = c(3, 7, 1),
+  word = c("three", "seven", "one"),
+  stringsAsFactors = FALSE
+)
+d
+```
+
+### Interactive view of a `data.frame`
+
+* The `View` function opens an **interactive view** of a `data.frame`
+* When using RStudio, the view also has **sort** and **filter** buttons
+* Note: sorting or filtering the view have no effect on the object
+
+```{r, echo=FALSE, fig.cap="Table view in Rstudio", out.width="80%"}
+knitr::include_graphics("images/lesson_04_table_view.png")
+```
+
+### `data.frame` properties
+
+* We can get the number of **rows** and number of **columns** in a `data.frame` with `nrow` and `ncol`, respectively - 
+
+```{r}
+nrow(d)
+```
+
+```{r}
+ncol(d)
+```
+
+* Or **both** of them as a vector of length 2 with `dim` - 
+
+```{r}
+dim(d)
+```
+
+* `data.frame`s have row and column **names**, which we can get with `rownames` and `colnames`, respectively - 
+
+```{r}
+rownames(d)
+```
+
+```{r}
+colnames(d)
+```
+
+* We can also **set** row or column names by assigning new values to these properties - 
+
+```{r}
+colnames(d)[1] = "Number"
+d
+```
+
+```{r}
+colnames(d)[1] = "num"
+d
+```
+
+* `str` gives a summary of the object **structure** - 
+
+```{r}
+str(d)
+```
+
+### `data.frame` subsetting
+
+* A `data.frame` **subset** can be obtained with the `[` operator
+* A `data.frame` is a two-dimensional object, therefore the index is composed of **two vectors** -
+    * The first vector refers to **rows**
+    * The second vector refers to **columns**
+* Each of these vectors can be one of the following **types** - 
+    * `numeric` - Specifying the **indices** of rows/columns to retain
+    * `character` - Specifying the **names** of rows/columns to retain
+    * `logical` - Specifying **whether** to retain each row/column
+* The rows or column index can be **omitted**, in which case we get all rows or all columns, respectively
+
+```{r}
+d[1, 1]        # Row 1, column 1
+
+d[c(1, 3), 2]  # Rows 1 & 3, column 2
+
+d[2, ]         # Row 2
+
+d[, 2:1]       # Columns 2 & 1
+```
+
+* A subset with a **single column** can be returned as - 
+    * A vector (`drop=TRUE`, the default)
+    * A `data.frame` (`drop=FALSE`)
+* For example - 
+
+```{r}
+d[1:2, 1]
+```
+
+```{r}
+d[1:2, 1, drop = FALSE]
+```
+
+* Question: why do you think this applies to a single column, rather than a single row?
+
+* We can also use a `character` index to specify the **names** of rows and/or columns to retain in the subset - 
+
+```{r}
+d[, "num"]
+```
+
+* The `$` operator is a shortcut for getting a **single column** from a `data.frame` -
+
+```{r}
+d$num
+```
+
+```{r}
+d$word
+```
+
+Summary of subset operators in R:
+
+| Syntax | Objects | Returns |
+|---|---|---|
+| `x[i]` | **vector**, **table**, **matrix**, **array**, **list** | Subset `i` | 
+| `x[[i]]` | vectors, **lists** | Single element `i` | 
+| `x$i` | **tables**, lists | Single element `i` | 
+| `x@n` | S4 objects | Slot `n` | 
+
+Table: Subset operators in R
+
+* The third option for a `data.frame` index is a `logical` vector, specifying **whether** to retain each row or column
+* Most commonly it is used to filter `data.frame` **rows** based on the values of one or more **columns** - 
+
+```{r}
+d[d$num == 1, ]
+```
+
+```{r}
+d[d$word == "seven" | d$word == "three", ]
+```
+
+* Let's go back to the Kinneret example from **Lesson 03** - 
+
+```{r}
+may = c(
+  -211.92,-208.80,-208.84,-209.12,-209.01,-209.60,
+  -210.24,-210.46,-211.76,-211.92,-213.13,-213.18,
+  -209.74,-208.92,-209.73,-210.68,-211.10,-212.18,
+  -213.26,-212.65,-212.37
+)
+nov = c(
+  -212.79,-209.52,-209.72,-210.94,-210.85,-211.40,
+  -212.01,-212.25,-213.00,-213.71,-214.78,-214.34,
+  -210.93,-210.69,-211.64,-212.03,-212.60,-214.23,
+  -214.33,-213.89,-213.68
+)
+```
+
+* Using these vectors we will construct the following `data.frame` - 
+
+```{r}
+kineret = data.frame(year = 1991:2011, may, nov)
+```
+
+```{r}
+head(kineret)
+```
+
+* Using a **logical index** we can get a subset of years when the Kinneret level in May was less than `-213` - 
+
+```{r}
+kineret[kineret$may < -213, "year"]  # Method 1
+```
+
+```{r}
+kineret$year[kineret$may < -213]     # Method 2
+```
+
+* Similarly, we can get a subset with **all data** for those years - 
+
+```{r}
+kineret[kineret$may < -213, ]
+```
+
+### Creating new columns
+
+* Assignment into a column which does not exist adds a **new column** - 
+
+```{r}
+kineret$d_nov = c(NA, diff(kineret$nov))
+```
+
+```{r}
+head(kineret)
+```
+
+## Flow control
+
+* The default is to let the computer execute **all** expressions in the same **order** they are given in the code
+* Flow control commands are a way to **modify** the sequence of code execution
+* We learn two flow control operators, from two categories - 
+    * `if` and `else` - A **conditional**, conditioning the execution of code
+    * `for` - A **loop**, executing code more than once
+
+### Conditionals
+
+* The purpose of the **conditional** is to condition the execution of code
+* An `if`-`else` conditional in R contains the following components - 
+    * The `if` keyword
+    * A condition
+    * Code to be executed if the condition is `TRUE`
+    * The `else` keyword (optional)
+    * Code to be executed if the condition is `FALSE` (optional)
+* The condition needs to be evaluated to a **single logical value** (`TRUE` or `FALSE`); If it is `TRUE` then the code section after `if` is executed
+
+* Conditional with `if` - 
+
+```{r, eval=FALSE}
+if(condition) {
+  expressions
+}
+```
+
+* Conditional with `if` and `else` - 
+
+```{r, eval=FALSE}
+if(condition) {
+  trueExpressions
+} else {
+  falseExpressions
+}
+```
+
+* For example - 
+
+```{r}
+x = 3
+x > 2
+
+if(x > 2) print("x is large!")
+```
+
+```{r}
+x = 0
+x > 2
+
+if(x > 2) print("x is large!")
+```
+
+* Now also with `else`
+* The first code section is executed when the condition is `TRUE` - 
+
+```{r}
+x = 3
+if(x > 2) print("x is large!") else print("x is small!")
+```
+
+* The second code section is executed when the condition is `FALSE` - 
+
+```{r}
+x = 1
+if(x > 2) print("x is large!") else print("x is small!")
+```
+
+* We can use a conditional to write our own version of the `abs` function - 
+
+```{r}
+abs2 = function(x) {
+  if(x >= 0) return(x) else return(-x)
+}
+```
+
+* For example - 
+
+```{r}
+abs2(-3)
+```
+
+```{r}
+abs2(24)
+```
+
+* Question 1: what happens when the argument of `abs2` is of length >1?
+* Question 2: write a function `is_myname` that checks if the given text is your name, returning `TRUE` or `FALSE`
+
+```{r, include=FALSE}
+is_myname = function(x) x == "Michael"
+```
+
+```{r}
+is_myname("Michael")
+is_myname("Yossi")
+```
+
+### Loops
+
+* A **loop** is used to execute a given code section more than once
+* The number of **times** the code is executed is determined in different ways in different types of loops
+* In a `for` loop, the number of times the code is executed is determined in advance based on the length of a **vector** passed to the loop
+* The code is executed once for **each element** of the vector
+* In each "round", the current element is assigned to a **variable** which we can use in the loop code
+
+* A `for` loop is composed of the following parts - 
+    * The `for` keyword
+    * The variable name `symbol` getting the current vector value
+    * The `in` keyword
+    * The vector `sequence`
+    * A code section `expressions`
+
+```{r, eval=FALSE}
+for(symbol in sequence) {
+  expressions
+}
+```
+
+* Note: the constant keywords are just `for` and `in`
+
+* For example - 
+
+```{r}
+for(i in 1:5) print(i)
+```
+
+* The expression `print(i)` is executed 5 times, according to the length of the vector `1:5`
+* Each time, `i` gets the next value of `1:5` and the code section prints `i` on screen
+
+* The vector defining the `for` loop does not necessarily need to be numeric -
+
+```{r}
+for(b in c("Test", "One", "Two")) print(b)
+```
+
+* The expression `print(b)` is executed 3 times, according to the length of the vector `c("Test", "One", "Two")`
+* Each time, `b` gets the next value of the vector and the code section prints `b` on screen
+
+* In case the vector is numeric, it does not necessarily need to be composed of consecutive - 
+
+```{r}
+for(i in c(1,15,3)) print(i)
+```
+
+* The expression `print(i)` is executed 3 times, according to the length of the vector `c(1,15,3)`
+* Each time, `i` gets the next value of the vector and the code section prints `i` on screen
+
+* The code section does not have to use the current value of the vector - 
+
+```{r}
+for(i in 1:5) print("A")
+```
+
+* The expression `print("A")` is executed 5 times, according to the length of the vector `1:5`
+* Each time, the code section prints `"A"` on screen
+
+* The following `for` loop prints each of the numbers from 1 to 10 multiplied by 5 - 
+
+```{r}
+for(i in 1:10) print(i * 5)
+```
+
+* Question: How can we prints a multiplication table for 1-10, using a `for` loop?
+
+```{r, echo=FALSE}
+for(i in 1:10) print(i * 1:10)
+```
+
+* As another example of using a `for` loop, we can write a function named `x_in_y` 
+* The function accepts **two vectors** `x` and `y`
+* For each **element** in `x` the function checks if it is **found** in `y`
+* It returns a `logical` vector of the same length as `x`
+
+* For example - 
+
+```{r, include=FALSE}
+x_in_y = function(x, y) {
+  result = NULL
+  for(i in x) result = c(result, any(i == y))
+  result
+}
+```
+
+```{r}
+x_in_y(c(1, 2, 3, 4, 5), c(2, 1, 5))
+```
+
+* We can use a `for` **loop** to check if each element in `x` is contained in `y` - 
+
+```{r}
+x = c(1, 2, 3, 4, 5)
+y = c(2, 1, 5)
+```
+
+```{r}
+for(i in x) print(any(i == y))
+```
+
+* In a function, we can **"collect"** the results into a vector instead of printing them on screen - 
+
+```{r}
+# Version 1
+x_in_y = function(x, y) {
+  result = NULL
+  for(i in x) result = c(result, any(i == y))
+  result
+}
+```
+
+```{r}
+# Version 2
+x_in_y = function(x, y) {
+  result = rep(NA, length(x))
+  for(i in 1:length(x)) result[i] = any(x[i] == y)
+  result
+}
+```
+
+* In fact, we don't need to write a function such as `x_in_y` ourselves; we can use the `%in%` **operator**
+* The `%in%` operator, with an expression `x %in% y`, returns a `logical` vector indicating the **presence** of each element of `x` in `y` -
+
+```{r}
+1:5 %in% c(1, 2, 5)
+```
+
+```{r}
+1:5 %in% c(1, 2, 3, 5)
+```
+
+```{r}
+c("a", "B", "c", "ee") %in% letters
+```
+
+```{r}
+c("a", "B", "c", "ee") %in% LETTERS
+```
+
+## Reading tables from a file
+
+### Using `read.csv`
+
+* The table `rainfall.csv` contains average **monthly rainfall** data (based on the period 1980-2010) for September-May, in 169 meteorological stations in Israel
+* The table also contains station **name**, station **number**, **elevation** and **X-Y** coordinates
+
+```{r, echo=FALSE, fig.cap="The file `rainfall.csv` opened in Excel", out.width="70%"}
+knitr::include_graphics("images/lesson_04_table_in_excel.png")
+```
+
+* In addition to creating a table with `data.frame`, we can read an existing table **from disk**, such as from a Comma-Separated Values (CSV) file
+* We can read a CSV file with `read.csv` - 
+
+```{r, eval=FALSE}
+# Windows
+read.csv("C:\\Data2\\rainfall.csv")
+read.csv("C:/Data2/rainfall.csv")
+
+# Mac / Linux
+read.csv("~/Dropbox/Data2/rainfall.csv")
+```
+
+```{r, echo=FALSE, out.width="40%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_04_import.svg")
+```
+
+* Note: the separating character on Windows is `/` or `\\`, not the familiar `\`
+* In case the file path uses the **incorrect separator** `\` we get an error - 
+
+```{r, error=TRUE}
+read.csv("C:\Data2\rainfall.csv")
+```
+
+* In case the file **does not exist** we get a different error - 
+
+```{r, error=TRUE}
+read.csv("C:\\Data2\\rainfall.csv")
+```
+
+* The `stringsAsFactors` parameter of `read.csv` (and several other functions) determines whether **text columns** are converted to `factor` (default is `TRUE`)
+* Usually, we want to **avoid** the conversion with `stringsAsFactors=FALSE`
+
+```{r, eval=FALSE}
+read.csv(
+  "~/Dropbox/Data2/rainfall.csv", 
+  stringsAsFactors = FALSE
+)
+```
+
+### The working directory
+
+* R always points to a certain directory, knows as the **working directory**
+* We can **get** the current working directory with `getwd` - 
+
+```{r}
+getwd()
+```
+
+* We can **set** a new working directory with `setwd` - 
+
+```{r, eval=FALSE}
+setwd("~/Dropbox/Data2")
+```
+
+* When **reading a file** from the working directory, we can specify just the **file name** instead of the full path - 
+
+```{r, eval=FALSE}
+read.csv("rainfall.csv")
+```
+
+### Example: the `rainfall.csv` dataset structure
+
+* Let's **read** the `rainfall.csv` file - 
+
+```{r, eval=FALSE}
+rainfall = read.csv(
+  "rainfall.csv", 
+  stringsAsFactors = FALSE
+)
+```
+
+```{r, include=FALSE}
+rainfall = read.csv(
+  "data/rainfall.csv", 
+  stringsAsFactors = FALSE
+)
+```
+
+* We can also use the `head` or `tail` function which return a subset of the **first** or **last** several rows, respectively - 
+
+```{r}
+head(rainfall)
+```
+
+* We can also use the `head` or `tail` function which return a subset of the **first** or **last** several rows, respectively - 
+
+```{r}
+tail(rainfall)
+```
+
+* We can check the table **structure** with `str` - 
+
+```{r}
+str(rainfall)
+```
+
+* Question: create a plot of rainfall in January (`jan`) as function of elevation (`altitude`) based on the `rainfall` table
+
+```{r, echo=FALSE, fig.cap="Rainfall in January as function of elevation", fig.width=5, fig.height=4.5, out.width="65%"}
+plot(rainfall$altitude, rainfall$jan)
+```
+
+* We can get specific information from the table trough **subsetting** and **summarizing**
+* What is the elevation of the lowest and highest stations?
+
+```{r}
+min(rainfall$altitude)
+```
+
+```{r}
+max(rainfall$altitude)
+```
+
+* What is the name of the lowest and highest station?
+
+```{r}
+rainfall$name[which.min(rainfall$altitude)]
+```
+
+```{r}
+rainfall$name[which.max(rainfall$altitude)]
+```
+
+* How much rainfall does the `"Haifa University"` station receive in April?
+
+```{r}
+rainfall$apr[rainfall$name == "Haifa University"]
+```
+
+* We can create a **new column** through assignment - 
+
+```{r}
+rainfall$sep_oct = rainfall$sep + rainfall$oct
+```
+
+* To accomodate more complex calculations, we can also create a new column inside a `for` **loop** going over table **rows** - 
+
+```{r}
+m = c(
+  "sep", "oct", "nov", "dec", "jan",
+  "feb", "mar", "apr", "may"
+)
+for(i in 1:nrow(rainfall)) {
+  rainfall$annual[i] = sum(rainfall[i, m])
+}
+```
+
+```{r}
+head(rainfall)
+```
+
+## The `apply` function
+
+* The `apply` function can **replace** `for` loops, in situations when we are interested in applying the **same function** on all subsets of certain **dimension** of a `data.frame`, a `matrix` or an `array`
+* In case of a table, there are two **dimensions** we can work on - 
+    * **Rows** = Dimension `1`
+    * **Columns** = Dimension `2`
+* The `apply` function needs three arguments - 
+    * `X` - The **object** we are working on: `data.frame`, `matrix` or `array`
+    * `MARGIN` - The **dimension** we are working on
+    * `FUN` - The **function** applied on that dimension
+
+```{r, echo=FALSE, fig.cap="The `apply` function, operating on columns (left) or rows (rigth)", out.width="100%"}
+knitr::include_graphics("images/lesson_04_apply.svg")
+```
+
+* For example, the `apply` function can replace a `for` loop for calculating **average** annual rainfall **per station**
+* The `sum` function is applied on the **rows** dimension - 
+
+```{r}
+rainfall$annual = apply(
+  X = rainfall[, m], 
+  MARGIN = 1, 
+  FUN = sum
+)
+```
+
+* As another example, we can calculate **average** monthly rainfall **per month**
+* This time, the `mean` function is applied on the **columns** dimension - 
+
+```{r}
+avg_rain = apply(rainfall[, m], 2, mean)
+```
+
+* The result `avg_rain` is a **named** `numeric` vector
+* Element names correspond to **column** names of `X` - 
+
+```{r}
+avg_rain
+```
+
+* We can quickly visualize the values with `barplot` - 
+
+```{r, eval=FALSE}
+barplot(avg_rain)
+```
+
+```{r, echo=FALSE, fig.cap="Average rainfall per month, among 169 stations in Israel", fig.width=7, fig.height=4.75, out.width="100%"}
+barplot(avg_rain)
+```
+
+* As another example, let's use `apply` to find the station **name** with the **highest** rainfall **per month**
+* The following applies `which.max` on the columns, returning the row **indices** where the maximal rainfall values are located per column - 
+
+```{r}
+max_st = apply(rainfall[, m], 2, which.max)
+max_st
+```
+
+* We can get the corresponding station **names** by subsetting the `name` column using `max_st` - 
+
+```{r}
+rainfall$name[max_st]
+```
+
+* It is convenient to **combine** the names and values in a table - 
+
+```{r}
+data.frame(
+  month = m,
+  name = rainfall$name[max_st],
+  stringsAsFactors = FALSE
+)
+```
+
+## Table join {#table-join}
+
+### Joins for classification
+
+* The `dates.csv` table contains the **dates** when each image in the raster `modis_south.tif`, which we will work with in **Lesson 05**, was taken - 
+
+```{r}
+dates = read.csv("data/MOD13A3_2000_2019_dates.csv", stringsAsFactors = FALSE)
+```
+
+```{r}
+head(dates)
+```
+
+* For further analysis of the images we would like to be able to group them **by season**
+* How can we calculate a new `season` **column**, specifying the season each date belongs to?
+
+| season | months | 
+|---|---|
+| `"winter"` | `12`, `1`, `2` |
+| `"spring"` | `3`, `4`, `5` |
+| `"summer"` | `6`, `7`, `8` |
+| `"fall"` | `9`, `10`, `11` |
+
+Table: Months and seasons
+
+One way is to **assign** each season name into a **subset** of a new `season` column. First we need to figure out the month each date belongs to:
+
+```{r}
+dates$date = as.Date(dates$date)
+dates$month = format(dates$date, "%m")
+dates$month = as.numeric(dates$month)
+```
+
+
+```{r}
+dates$season[dates$month %in% c(12, 1:2)] = "winter"
+dates$season[dates$month %in% 3:5] = "spring"
+dates$season[dates$month %in% 6:8] = "summer"
+dates$season[dates$month %in% 9:11] = "fall"
+```
+
+```{r}
+head(dates)
+```
+
+* This method of classification may be inconvenient when we have many categories or complex criteria
+* Another option is to use a **table join**
+
+### Using R packages
+
+* All object definitions (including functions) in R are contained in **packages**
+* To use a particular object, we need to -
+    * **Install** the package with `install.packages` (once)
+    * **Load** the package using the `library` function (in each new R session)
+    * Loading a package basically means the code we downloaded is **executed**, loading all objects the package defined into the **RAM**
+* All function calls we used until now did require this. Why? Because several packages are **installed** along with R and **loaded** on R start-up
+* There are several more packages which are installed by default but **not loaded** on start-up (total of ~30)
+
+```{r, echo=FALSE, fig.cap="Packages included with R^[R in a Nutshell, 2010.]", out.width="30%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_04_r_packages_a.svg")
+```
+
+```{r, echo=FALSE, fig.cap="Packages included with R (zoom-in)^[R in a Nutshell, 2010.]", out.width="100%"}
+knitr::include_graphics("images/lesson_04_r_packages_a.svg")
+```
+
+Most of the [~15,000 R packages](https://cran.r-project.org/web/packages/) (as of Sep 2019) are *not* installed by default. To use one of these packages we first need to **install** it on the computer. Installing a package is a one-time operation using the `install.packages` function. After the package is installed, each time we want to use it we need to **load** it using `library`. 
+
+In the next example we use a package called `dplyr`. This package is not installed with R, we need to **install** it ourselves:
+
+```{r, eval=FALSE}
+install.packages("dplyr")
+```
+
+If the package is already installed, running `install.packages` overwrites the old installation. This is done intentionally if you you want to install a newer version of the package. Once the package is already installed, we need to use the `library` function to load it into memory. Note how package name can be passed to `library` without quotes: 
+
+```{r}
+library(dplyr)
+```
+
+Other than `dplyr`, the main packages that we are going to use in the book are `stars`, `sf`, `units`, `gstat` and `automap`. 
+
+### Joining tables with `left_join`
+
+The `left_join` function from `dplyr` does a **left join** between tables. The first two parameters are the tables that need to be joined, `x` and `y`. The third `by` parameter is the common column name(s) by which the tables need to be joined. 
+
+```{r, echo=FALSE, fig.cap="Join types^[http://r4ds.had.co.nz/relational-data.html]", out.width="80%"}
+knitr::include_graphics("images/lesson_04_join_types.png")
+```
+
+Next we prepare a table `tab` with the **classification** of months into seasons:
+
+```{r}
+tab = data.frame(
+  month = c(12, 1:11),
+  season = rep(c("winter","spring","summer","fall"), each = 3),
+  stringsAsFactors = FALSE
+)
+```
+
+* Next we prepare a table `tab` with the classification of months into seasons - 
+
+```{r, eval=FALSE}
+tab
+```
+
+```{r, echo=FALSE, size="scriptsize"}
+tab
+```
+
+* Now we can **join** the `dates` and `tab` tables 
+* Before that, we **remove** the `season` column we manually created in the previous example -
+
+```{r}
+library(dplyr)
+
+dates$season = NULL
+dates = left_join(dates, tab, by = "month")
+```
+
+```{r}
+head(dates)
+```
+
+## Writing tables to file
+
+* Using `write.csv` we can **write** the contents of a `data.frame` to a **CSV file** -
+
+```{r}
+write.csv(dates, "data/MOD13A3_2000_2019_dates2.csv", row.names = FALSE)
+```
+
+* The `row.names` parameter determines whether the **row names** are saved
+* Note: like in `read.csv`, we can either give a **full** file path or just the **file name**; if the specify just the file name then the file is written to the **working directory**
+
+```{r, echo=FALSE, out.width="40%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_04_export.svg")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

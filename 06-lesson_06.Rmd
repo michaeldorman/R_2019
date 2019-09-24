@@ -1,0 +1,411 @@
+# Raster algebra {#raster-algebra}
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(fig.align = 'center', collapse = TRUE, R.options = list(width = 80))
+```
+
+## Aims
+
+* Calculating new rasters based on one or more overlapping rasters with **raster algebra**
+* Converting continuous rasters to categorical ones using raster **classification**
+* Learning methods of raster **subsetting** and methods of **transforming** rasters to other data structures
+
+## Raster subsetting
+
+In most of the examples in this Chapter, we are going to use the `MOD13A3_2000_2019.tif` raster which we already met in Section \@ref(rasters). Let's read it into memory:
+
+```{r}
+r = read_stars("data/MOD13A3_2000_2019.tif")
+names(r) = "NDVI"
+```
+
+The stars subset operator `[` works as follows:
+
+* The first argument selects **attributes**
+* The second argument selects the **first** dimension, usually `[x]`, or columns
+* The third argument selects the **second** dimension, usually `[y]`, or rows
+* And so on for the remaining dimensions, if any
+
+We can subset a raster using indices. For example:
+
+```{r}
+s = r[, 100:102, 200:202, 1:2]
+plot(round(s, 2), text_values = TRUE)
+```
+
+Another example:
+
+```{r}
+s = r[, (1:145) > 99 & (1:145) < 104, 200:203, 1:2]
+plot(round(s, 2), text_values = TRUE)
+```
+
+`drop=TRUE`...
+
+We can access a "slice" of a single pixel through all of the raster layers, as follows:
+
+```{r}
+v = r[[1]][50, 200, ]
+class(v)
+```
+
+The result is a vector (why?). Plotting the vector displays a *time-series* of NDVI at a particular location (Figure \@ref(fig:single-pixel-ndvi)). 
+
+```{r single-pixel-ndvi, fig.cap="Single pixel values across all layers"}
+plot(v, type = "o")
+```
+
+The file `MOD13A3_2000_2019_dates2.csv` corresponds to the third dimension of `MOD13A3_2000_2019.tif`, containing the dates when each NDVI image was captured. This file includes the additional `season` column which we calculated in Section \@ref(table-join). Using the `MOD13A3_2000_2019_dates2.csv` table we can display dates on the x-axis: 
+
+```{r, fig.cap="Single pixel values across all layers", fig.width=8, fig.height=5, out.width="100%"}
+dates = read.csv("data/MOD13A3_2000_2019_dates2.csv", stringsAsFactors = FALSE)
+dates$date = as.Date(dates$date)
+plot(dates$date, v, type = "o", xlab = "Time", ylab = "NDVI")
+```
+
+We can improve the interpretability of the time series if we mark seasons with different color:
+
+```{r}
+cols = c("blue", "purple", "red", "yellow")
+seasons = c("winter", "spring", "summer", "fall")
+```
+
+We can use a `for` **loop** to mark the portion of the NDVI time series from each season:
+
+```{r, fig.cap="Single pixel values across all layers"}
+plot(dates$date, v, type = "l", xlab = "Time", ylab = "NDVI", col = "grey")
+for(i in 1:4) {
+  tmp = v
+  tmp[dates$season != seasons[i]] = NA
+  lines(dates$date, tmp, col = cols[i], type = "o")
+}
+```
+
+> What is the meaning of the following plot?
+
+```{r, fig.cap="Raster plot"}
+x = r[,,,1][[1]]
+x = as.numeric(x)
+y = r[,,,2][[1]]
+y = as.numeric(y)
+plot(x, y, xlab = "Band 1", ylab = "Band 2")
+```
+
+## Raster dimensions
+
+### Dimension properties
+
+```{r}
+dates = read.csv("data/MOD13A3_2000_2019_dates.csv", stringsAsFactors = FALSE)
+dates$date = as.Date(dates$date)
+r = st_set_dimensions(r, "band", values = dates$date, point = FALSE, names = "time")
+```
+
+### Converting a `matrix` to raster
+
+Another example:
+
+```{r}
+d = st_dimensions(x = 1:ncol(volcano), y = 1:nrow(volcano))
+volcano = st_as_stars(t(volcano))
+volcano = st_set_dimensions(volcano, 1, offset = 0, delta = 1)
+volcano = st_set_dimensions(volcano, 2, offset = nrow(volcano), delta = -1)
+volcano = st_set_dimensions(volcano, names = c("x", "y"))
+names(volcano) = "elevation"
+plot(volcano)
+```
+
+Creating a sample matrix:
+
+```{r}
+v = c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 
+NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, 
+NA, NA, NA, NA, NA, NA, 3, 2, 3, NA, NA, NA, NA, NA, NA, NA, 
+NA, NA, NA, NA, NA, NA, NA, 6, 3, 4, 8, 7, NA, NA, NA, NA, NA, 
+NA, 6, 10, 4, 2, 2, 6, 6, 4, 6, 9, 10, 14, 16, NA, NA, NA, NA, 
+NA, NA, 55, 76, 59, 27, 18, 24, 20, 17, 21, 23, 23, 41, 46, NA, 
+NA, NA, NA, NA, NA, 20, 153, 218, 194, 134, 94, 107, 148, 141, 
+116, 97, 143, 115, NA, NA, NA, NA, NA, NA, 6, 50, 211, 258, 283, 
+207, 231, 267, 256, 195, 178, 204, 168, NA, NA, NA, NA, NA, NA, 
+0, 13, 69, 173, 294, 323, 242, 322, 260, 290, 235, 233, 156, 
+NA, NA, NA, NA, NA, NA, 2, 5, 6, 139, 227, 386, 325, 367, 326, 
+368, 299, 291, 236, NA, NA, NA, NA, NA, NA, NA, 3, 3, 16, 100, 
+229, 399, 460, 388, 411, 366, 394, 325, NA, NA, NA, NA, NA, NA, 
+5, 5, 4, 3, 10, 97, 333, 486, 475, 403, 404, 404, 364, NA, NA, 
+NA, NA, NA, 8, 8, 9, 5, 5, 4, 12, 195, 415, 491, 421, 405, 432, 
+387, NA, NA, NA, 3, 5, 10, 10, 12, 5, 4, 5, 5, 13, 176, 418, 
+464, 453, 446, 384, 3, 5, 5, 7, 9, 11, 12, 7, 5, 4, 5, 6, 9, 
+24, 194, 387, 445, 430, 410, 3, 5, 7, 9, 11, 9, 11, 8, 10, 8, 
+8, 10, 34, 20, 22, 94, 160, 199, 222, 3, 2, 4, 5, 5, 14, 15, 
+21, 33, 15, 11, 23, 83, 69, 39, 55, 57, 30, 52)
+m = matrix(v, nrow = 19, ncol = 16)
+```
+
+Creating a `stars` object from a `matrix`:
+
+```{r}
+d = st_dimensions(x = 1:ncol(m), y = 1:nrow(m))
+s = st_as_stars(t(m))
+s = st_set_dimensions(s, 1, offset = 34.90417, delta = 0.01333333)
+s = st_set_dimensions(s, 2, offset = 32.91917, delta = -0.01333333)
+s = st_set_dimensions(s, names = c("x", "y"))
+s = st_set_crs(s, 4326)
+names(s) = "elevation"
+plot(s, text_values = TRUE)
+```
+
+## Merging `stars` objects
+
+...
+
+## Switching dimensions and attributes
+
+...
+
+## Raster algebra
+
+Often we have one or more overlapping rasters, and we want to apply the same operation on all pairs, triplets, etc. of overlapping pixels (Figure \@ref(fig:raster-algebra)). 
+
+```{r raster-algebra, echo=FALSE, fig.cap="Raster algebra^[http://rpubs.com/etiennebr/visualraster]", out.width="100%"}
+knitr::include_graphics("images/lesson_06_raster_algebra.svg")
+```
+
+* In **raster algebra**, we can use different operators - 
+    * Arithmetic: `+`, `-`, `*`, `/`
+    * Logical: `<`, `<=`, `>`, `>=`, `==`, `!=`, `!`
+    * Certain functions: `abs`, `round`, `ceiling`, `floor`, `trunc`, `sqrt`, `log`, `log10`, `exp`, `cos`, `sin`, `max`, `min`, `range`, `prod`, `sum`, `any`, `all`
+* On each pair (triplet, etc.) of overlapping rasters, to get a **new raster** where each pixel value is the result of the given **operation** on the **overlapping pixels** in the input rasters
+* The operation can also include rasters and `numeric` values, as long as the first argument is a raster
+
+https://cran.r-project.org/web/packages/raster/vignettes/Raster.pdf
+
+* For example: 
+
+```{r}
+x = r[, , , 1]
+y = r[, , , 2]
+```
+
+* Here are several examples of **raster algebra** operations - 
+
+```{r}
+plot(x + y)
+```
+
+A **logical** raster algebra operation produces a `logical` raster, a raster with pixel values `TRUE` and `FALSE`. For example: 
+
+```{r, echo=FALSE, fig.cap="Logical raster algebra operation"}
+plot(1 * (x > 0.5))
+plot(1 * (x < y))
+plot(1 * is.na(x))
+```
+
+A logical raster can be used to get a subset of raster values, and possibly assign new values into the subset. For example, we can use the logical raster `is.na(r)` to replace all `NA` values in the raster `r` with a new value: 
+
+```{r}
+x1 = x
+x1[is.na(x1)] = mean(x1[[1]], na.rm = TRUE)
+```
+
+* Question: what is the meaning of the expression `mean(r[], na.rm = TRUE)`?
+
+```{r, fig.cap="Assignmnent to raster subset using logical raster (before and after)", fig.width=7, fig.height=6.85, out.width="70%"}
+plot(c(x, x1, along = 3))
+```
+
+In operations where a `numeric` representation is required, such as:
+
+* An arithmetic operation 
+* Saving to a file
+
+logical raster values `TRUE` and `FALSE` become `1` and `0`, respectively
+
+```{r}
+(is.na(x))$NDVI[1:2, 1:2, 1]
+(is.na(x)*2)$NDVI[1:2, 1:2, 1]
+```
+
+> What is the *proportion* of `NA` values in `x`? And in `y`?
+
+## Landsat
+
+For the following example, let's read another multi-band raster file named `landsat_04_10_2000.tif`. This is a part of a **Landsat-5** satellite image with bands 1-5 and 7, after radiometric and atmospheric corrections. The raster values represent spectral **reflectance**, therefore all values are in the range 0-1
+
+```{r}
+l = read_stars("data/landsat_04_10_2000.tif")
+```
+
+We can assign meaningful layer names according to the spectral range^[https://landsat.usgs.gov/what-are-band-designations-landsat-satellites]:
+
+```{r}
+l = st_set_dimensions(l, "band", values = c("Blue", "Green", "Red", "NIR", "SWIR1", "SWIR2"))
+```
+
+Plot:
+
+```{r, fig.cap="Landsat satellite image, bands 1-5 and 7"}
+plot(l)
+```
+
+## True color and false color images
+
+```{r, echo=FALSE, fig.cap="RGB image", out.width="100%"}
+knitr::include_graphics("images/lesson_06_plot_rgb.jpg")
+```
+
+https://datacarpentry.org/organization-geospatial/01-spatial-data-structures-formats/index.html
+
+```{r, echo=FALSE, fig.cap="Image stretch", out.width="70%"}
+knitr::include_graphics("images/lesson_06_linear_image_stretch.jpg")
+```
+
+https://datacarpentry.org/organization-geospatial/01-spatial-data-structures-formats/index.html
+
+* **True color** and **false color** images can be produced with the `plotRGB` function - 
+
+```{r, fig.cap="True color (left) and false color (right) images", fig.width=8, fig.height=4.7, out.width="100%"}
+# True color image
+plot(l, rgb = c(3, 2, 1))
+# False color image
+plot(l, rgb = c(4, 3, 2))
+```
+
+## Raster algebra
+
+**NDVI** can be calculated using raster algebra, as the difference between NIR and Red reflectance, divided by their sum:
+
+$$NDVI=\frac{NIR-Red}{NIR + Red}$$
+
+For example: 
+
+```{r}
+ndvi = (l[,,,4] - l[,,,3]) / (l[,,,4] + l[,,,3])
+names(ndvi) = "NDVI"
+```
+
+Plot:
+
+```{r, fig.cap="NDVI image", fig.width=5, fig.height=5.5, out.width="60%"}
+plot(ndvi)
+```
+
+## Classification
+
+```{r, echo=FALSE, fig.cap="Raster classification^[http://rpubs.com/etiennebr/visualraster]", out.width="100%"}
+knitr::include_graphics("images/lesson_06_reclassify.svg")
+```
+
+The `reclassify` function can be used to **reclassify** a raster, i.e. to convert a **continuous** raster to a **categorical** one
+
+```{r}
+l_rec = ndvi
+l_rec[ndvi <= 0.2] = 0
+l_rec[ndvi > 0.2] = 1
+```
+
+* Question: can we do the above reclassification with a single expression?
+
+```{r, fig.cap="Original and reclassified NDVI images", fig.width=8, fig.height=5, out.width="100%"}
+plot(c(ndvi, l_rec, along = 3))
+```
+
+## Generalizing raster algebra with `st_apply`
+
+### Operating on each pixel
+
+```{r}
+s = r[, 100:103, 200:203, 1:2]
+s[[1]]
+```
+
+```{r}
+u = s[,,,1] + s[,,,2] + 10
+u[[1]]
+```
+
+```{r}
+u = st_apply(s, 1:2, function(x) sum(x) + 10)
+u[[1]]
+```
+
+* The `overlay` function makes it possible to apply any **custom**, user-defined, raster algebra function
+* The `fun` parameter determines the **function** which calculates each pixel value given the respective pixel values of the input raster
+* The `fun` function needs to - 
+    * Accept a **vector** of **any length**
+    * And return - 
+        * A **vector** of **length 1**, in which case `overlay` returns a single-band raster, or
+        * A **vector** of (fixed) **length n**, in which case `overlay` returns a multi-band raster with n layers
+
+* For example, the following code section uses a **custom function** `f` to create a new raster `s` where each pixel value is the **average** of the first 10 layers in `r` (excluding `NA`s)
+
+```{r}
+s = st_apply(r, 1:2, mean, na.rm = TRUE)
+```
+
+* Plot - 
+
+```{r, fig.cap="Result of `overlay` with `mean` function and `na.rm=TRUE`", fig.width=7, fig.height=6.85, out.width="70%"}
+plot(s)
+```
+
+* In the following example we use `fun=range`, which is a function that returns a vector of **length 2** - 
+
+```{r}
+f = function(x) if(!all(is.na(x))) range(x, na.rm = TRUE) else c(NA, NA)
+s = st_apply(r, 1:2, f)
+```
+
+* Plot - 
+
+```{r, fig.cap="Result of applying the `range` function with `na.rm=TRUE` on each pixel", fig.width=7, fig.height=6.85, out.width="70%"}
+plot(s)
+```
+
+* Question: what do you think the result `s` will be?
+
+* As another example, we can calculate the **difference** between the **maximum** and **minimum** in the first 23 layers of `r` - 
+
+```{r}
+f = function(x) if(!all(is.na(x))) diff(range(x, na.rm = TRUE)) else NA
+```
+
+```{r}
+s = st_apply(r, 1:2, f)
+```
+
+* Plot - 
+
+```{r, fig.cap="Result of `overlay` with `max`/`min` difference", fig.width=7, fig.height=6.85, out.width="70%"}
+plot(s)
+```
+
+* Another useful case for `overlay` is calculating the **proportion** of `NA` values per pixel - 
+
+```{r}
+f = function(x) if(all(is.na(x))) NA else mean(is.na(x))
+s = st_apply(r, 1:2, f)
+```
+
+* Plot - 
+
+```{r, fig.cap="Result of `overlay`", fig.width=7, fig.height=6.85, out.width="70%"}
+plot(s)
+```
+
+### Operating on each layer
+
+* The `cellStats` function can be used to apply a function on the values of **each layer** in a raster, to get a **vector** of summaries - 
+
+```{r}
+x = st_apply(r, 3, mean, na.rm = TRUE)
+x1 = st_apply(r, 3, min, na.rm = TRUE)
+x2 = st_apply(r, 3, max, na.rm = TRUE)
+```
+
+```{r}
+plot(x[[1]], type = "o", ylim = range(r[[1]], na.rm = TRUE), ylab = "NDVI")
+lines(x1[[1]], type = "o", col = "blue")
+lines(x2[[1]], type = "o", col = "red")
+```
+
+

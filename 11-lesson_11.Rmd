@@ -1,0 +1,651 @@
+# Combining rasters and vector layers {#combining-rasters-and-vector-layers}
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(fig.align = 'center', collapse = TRUE, R.options = list(width = 80))
+```
+
+## Aims
+
+* Learn how to move from vector to raster representation, and vice versa
+* Learn how to get raster values from locations defined in a vector layer
+
+## Vector layer → raster
+
+* Recreating the `l_rec_focal_clump` raster from **Lesson 09** - 
+
+```{r, message=FALSE}
+library(stars)
+
+l = read_stars("data/landsat_04_10_2000.tif")
+ndvi = (l[,,,4] - l[,,,3]) / (l[,,,4] + l[,,,3])
+names(ndvi) = "NDVI"
+l_rec = ndvi
+l_rec[l_rec < 0.2] = 0
+l_rec[l_rec >= 0.2] = 1
+get_neighbors = function(m, pos) {
+  v = c(
+    m[pos[1]-1, pos[2]-1],
+    m[pos[1]-1, pos[2]  ],
+    m[pos[1]-1, pos[2]+1],
+    m[pos[1],   pos[2]-1],
+    m[pos[1],   pos[2]+1],
+    m[pos[1]+1, pos[2]-1],
+    m[pos[1]+1, pos[2]  ],
+    m[pos[1]+1, pos[2]+1]
+  )
+  return(v)
+}
+focal2 = function(r, fun) {
+  template = r[,,,1]
+  input = template[[1]][,,1]
+  output = input
+  output[] = NA
+  for(i in 2:(nrow(input) - 1)) {
+    for(j in 2:(ncol(input) - 1)) {
+      v = get_neighbors(input, c(i, j))
+      output[i, j] = fun(v)
+    }
+  }
+  template[[1]] = array(output, dim = c(nrow(output), ncol(output), 1))
+  return(template)
+}
+l_rec_focal = focal2(l_rec, max)
+pol = st_as_sf(l_rec_focal, merge = TRUE)
+pol = pol[pol$NDVI == 1, ]
+```
+
+* In the following examples we will use a point layer with the locations of Lehavim and Lahav Kibbutz -
+
+```{r}
+library(sf)
+
+towns = st_read("data/towns.geojson", stringsAsFactors = FALSE)
+towns = st_transform(towns, st_crs(l))
+towns
+```
+
+```{r, echo=FALSE, out.width="100%", fig.cap="Location of Lehavim and Lahav Kibbutz"}
+plot(l, rgb = c(3, 2, 1), reset = FALSE)
+plot(towns, col = "red", pch = 16, add = TRUE)
+text(st_coordinates(towns), towns$name, pos = 3, col = "white")
+```
+
+```{r, echo=FALSE, fig.cap="Conversion of points, lines and polygons to raster", out.width="100%"}
+knitr::include_graphics("images/lesson_11_rasterize.svg")
+```
+
+http://rpubs.com/etiennebr/visualraster
+
+* The `rasterize` function **converts** a vector layer to a raster, given -
+    * `x` - A vector layer
+    * `y` - A raster "template"
+* The resulting raster will have `NA` values in pixels that **do not overlap** with the vector layer
+* The **value** of those pixels which **do overlap** can be determined in several ways, using the `field` and `fun` parameters - 
+    * `field` determines which values will be **passed** to the raster; this can be - 
+        * A constant value (e.g. `105`)
+        * A vector of the same length as the number of features
+        * A name of a vector layer attribute (e.g. `"annual"`)
+    * `fun` determines how pixel value is calculated when **more than one** feature overlaps with the same pixel
+        * A function, such as `min`, `max`, `mean`
+        * A text value, such as `"first"`, `"last"`, `"count"`, `"sum"`, `"min"`, `"max"`
+
+* For example, let's **transform** the `towns` vector layer to a raster, using `r` as a template -
+
+```{r}
+r = read_stars("data/MOD13A3_2000_2019.tif")
+rainfall = st_read("data/rainfall_pnt.shp", stringsAsFactors = FALSE)
+r = st_warp(r, crs = st_crs(rainfall))
+names(r) = "NDVI"
+template = r[,,,1]
+template[[1]][] = NA
+rainfall_r = st_rasterize(rainfall[, "jan"], template)
+```
+
+* The result has the **same dimensions** of `r` but **different values** -
+
+```{r}
+rainfall_r
+```
+
+* Plot - 
+
+```{r, fig.cap="Point layer converted to raster", out.width="85%"}
+plot(rainfall_r, reset = FALSE)
+plot(st_geometry(rainfall), add = TRUE)
+```
+
+* **Cropping** the raster will help see the result more clearly - 
+
+```{r}
+b = st_buffer(rainfall[rainfall$name == "Beer Sheva", ], 30000)
+rainfall_r = st_crop(rainfall_r, b)
+```
+
+```{r, fig.cap="Point layer converted to raster \\& cropped"}
+plot(rainfall_r, reset = FALSE)
+plot(st_geometry(rainfall[b, ]), add = TRUE)
+text(st_coordinates(rainfall[b, ]), rainfall[b, ]$name, pos = 3)
+```
+
+## Raster → Points
+
+* The **Raster→Points** transformation is done using function `rasterToPoints`
+* Pixel **centers** - except for pixels with `NA` in all layers - become points
+* We need to use `spatial=TRUE` to get a **spatial** (`Spatial*`) object
+* The **attribute table** of the point layer contains the raster values
+
+* For example, let's take a **subset** of the `r` raster with - 
+    * Layers 1-2
+    * Columns 1-3
+    * Rows 1-3
+
+```{r}
+u = r[, 200:202, 200:202, 1:2]
+```
+
+* We will **replace** some of the pixel values with `NA` - 
+
+```{r}
+sel = u
+sel[[1]][] = 0
+sel[[1]][3,2,1] = 1
+sel[[1]][2,3,] = 1
+u[sel == 1] = NA
+```
+
+* Now, we **transform** `u` to a point layer `p` -
+
+```{r}
+p = st_as_sf(u, as_points = TRUE)
+```
+
+* Note that there are **8 points** even though the raster has **9 pixels**, because one of the pixels had `NA` in all layers and was **not converted** to a point
+
+```{r}
+p
+```
+
+```{r, fig.width=8.15, fig.height=4.5, out.width="100%", fig.cap="Point layer created from a raster"}
+plot(u[,,,1], reset = FALSE)
+plot(st_geometry(p), add = TRUE)
+text(st_coordinates(p), as.character(round(p[[1]], 2)),pos = 3)
+plot(u[,,,2], reset = FALSE)
+plot(st_geometry(p), add = TRUE)
+text(st_coordinates(p), as.character(round(p[[2]], 2)),pos = 3)
+```
+
+## Extracting values to points
+
+```{r, echo=FALSE, fig.cap="Extracting raster values", out.width="80%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_11_extract.svg")
+```
+
+http://rpubs.com/etiennebr/visualraster
+
+* The `extract` function can be used to **"extract"** raster values based on another spatial layer
+* The simplest case is extracting values based on a **point** layer, because then each feature always intersects **just one** raster cell
+* For example, we can determine the `modis_avg` value for **each point** in the `rainfall` layer as follows - 
+
+```{r}
+rainfall = st_read("data/rainfall_pnt.shp", stringsAsFactors = FALSE)
+modis_avg = read_stars("data/modis_average.tif")
+names(modis_avg) = "NDVI"
+rainfall = st_join(rainfall, st_as_sf(modis_avg))
+```
+
+* Note: `extract` works with `sf` layers, so we don't need to convert to `sp` layers with `as(..., "Spatial")`
+
+* Plot - 
+
+```{r, out.width="100%", fig.cap="Raster values extracted to points"}
+plot(modis_avg, reset = FALSE)
+text(st_coordinates(rainfall), as.character(round(rainfall$NDVI, 2)), cex = 0.5, col = "black")
+```
+
+* **Plotting** NDVI as function of rainfall in December - 
+
+```{r, echo=FALSE, fig.width=5, fig.height=5, out.width="62%", fig.cap="Average NDVI as function of average rainfall in December"}
+plot(
+  rainfall$dec,
+  rainfall$NDVI,
+  xlab = "Rainfall (mm)",
+  ylab = "NDVI"
+)
+```
+
+* What is the **number** and **proportion** of `rainfall` points that have an `NA` value in the `ndvi` column?
+
+```{r}
+sum(is.na(rainfall$NDVI))   # Number of stations
+```
+
+```{r}
+mean(is.na(rainfall$NDVI))  # Proportion of stations
+```
+
+* Why did these `r sum(is.na(rainfall$NDVI))` stations get `NA`?
+
+* As another example, we will **extract** NDVI values from the first layer of `modis_south.tif`, to a column named `NDVI1` - 
+
+```{r}
+s = r[,,,1]
+s = st_as_sf(s)
+colnames(s)[1] = "NDVI1"
+rainfall = st_join(rainfall, s)
+```
+
+* Subset - 
+
+```{r}
+rs = rainfall[!is.na(rainfall$NDVI1), ]
+```
+
+* Plot - 
+
+```{r, eval=FALSE, size="scriptsize"}
+m = max(
+  c(rs$NDVI, rs$NDVI1), 
+  na.rm = TRUE
+)
+plot(
+  rainfall$NDVI, rainfall$NDVI1,
+  xlab = "NDVI average (2000-2012)",
+  ylab = "NDVI on 2000-02-18",
+  xlim = c(0, m), ylim = c(0, m)
+)
+abline(a = 0, b = 1, col = "red")
+text(
+  rainfall$NDVI, rainfall$NDVI1,
+  rainfall$name,
+  pos = 1
+)
+```
+
+```{r, echo=FALSE, fig.width=5, fig.height=5, fig.cap="Average NDVI vs. NDVI from particular date", out.width="70%"}
+m = max(
+  c(rs$NDVI, rs$NDVI1), 
+  na.rm = TRUE
+)
+plot(
+  rainfall$NDVI, rainfall$NDVI1,
+  xlab = "NDVI average (2000-2012)",
+  ylab = "NDVI on 2000-02-18",
+  xlim = c(0, m), ylim = c(0, m)
+)
+abline(a = 0, b = 1, col = "red")
+text(
+  rainfall$NDVI, rainfall$NDVI1,
+  rainfall$name,
+  pos = 1
+)
+```
+
+* Map - 
+
+```{r, fig.cap="Raster values extracted to points", fig.width=7, fig.height=6, out.width="80%"}
+plot(r[,,,1], reset = FALSE)
+plot(st_geometry(rs), add = TRUE)
+text(
+  st_coordinates(rs), 
+  rs$name, 
+  pos = 3
+)
+text(
+  st_coordinates(rs), 
+  as.character(round(rs$NDVI1, 2)), 
+  pos = 1
+)
+```
+
+* Similarly to the behavior or raster subsetting (**Lesson 06**), `extract` returns a `matrix` when the raster has **more than one** layer
+* In the resulting matrix, **rows** represent vector layer features and **columns** represent raster layers - 
+
+```{r}
+v = rainfall[rainfall$name %in% c("Lahav", "Yatir"), ]
+x = st_join(v, st_as_sf(r[,,,1:3]))
+```
+
+```{r}
+x
+```
+
+* We can rely on the fact that row and column **order** matches the feature and layer order, respectively, to assign **names** - 
+
+```{r}
+rownames(x) = v$name
+```
+
+```{r}
+dates = read.csv("data/MOD13A3_2000_2019_dates2.csv")
+dates$date = as.Date(dates$date)
+# colnames(x) = format(dates$date[1:3])
+```
+
+```{r}
+x
+```
+
+```{r, echo=FALSE, fig.cap='"Extract Multi Values to Points" tool in ArcGIS', out.width="100%"}
+knitr::include_graphics("images/lesson_11_arcgis_extract_multi_values_1.png")
+```
+
+```{r, echo=FALSE, fig.cap='"Extract Multi Values to Points" tool in ArcGIS', out.width="100%"}
+knitr::include_graphics("images/lesson_11_arcgis_extract_multi_values_2.png")
+```
+
+* The following example uses a **GPX** (GPS Exchange Format) file
+* A GPX file contains one or more **layers**, of the following types - 
+    * `waypoints`
+    * `tracks` (recorder track as line)
+    * `routes`
+    * `track_points` (recorder track as points)
+    * `route_points`
+    
+* To find out which **layers** the file contains we can use `st_layers` - 
+
+```{r}
+st_layers("data/track.gpx")
+```
+
+* Then we can read a **particular layer** into R - 
+
+```{r}
+track = st_read("data/track.gpx", "track_points")
+```
+
+* **Plotting** the track points on top of an elevation raster - 
+
+```{r}
+elevation = read_stars("data/elevation.tif")
+names(elevation) = "elevation"
+track = st_transform(track, st_crs(elevation))
+```
+
+```{r, out.width="100%", fig.width=9, fig.height=5.48, fig.cap="GPS track and elevation"}
+ext = st_bbox(track)
+ext[1:2] = ext[1:2] - 20000
+ext[3:4] = ext[3:4] + 20000
+plot(st_crop(elevation, ext), reset = FALSE)
+plot(st_geometry(track), add = TRUE)
+```
+
+* **Extracting** elevation values - 
+
+```{r}
+profile = st_join(track, st_as_sf(elevation))
+```
+
+* Plot - 
+
+```{r, fig.width=9, fig.height=5, out.width="100%", fig.cap="Elevation profile"}
+plot(profile$elevation, type = "l", ylab = "Elevation (m)")
+lines(track$ele, col = "red")
+```
+
+## Raster to contour lines
+
+* Reconstructing the **Haifa DEM** from **Lesson 09** - 
+
+```{r}
+dem1 = read_stars("data/srtm_43_06.tif")
+dem2 = read_stars("data/srtm_44_06.tif")
+dem = c(dem1, dem2, along = "x")
+dem = st_set_crs(dem, 4326)
+haifa = st_read("data/haifa.geojson", stringsAsFactors = FALSE)
+haifa_ext = st_buffer(haifa, 0.25, endCapStyle = "SQUARE")
+dem = dem[haifa_ext]
+dem = st_normalize(dem)
+dem = st_warp(src = dem, crs = 32636, method = "near", cellsize = 90)
+```
+
+* Raster **contours** can be created using the `rasterToContour` function
+* The `levels` parameter determines the raster **values** where contour lines are drawn - 
+
+```{r}
+range(dem$srtm_43_06.tif, na.rm = TRUE)
+```
+
+```{r}
+dem_contour = st_contour(dem, breaks = seq(-100, 600, 100), contour_lines = TRUE)
+```
+
+* The result is a `LINESTRING` layer with one feature per contour line - 
+
+```{r}
+dem_contour
+```
+
+Plot - 
+
+```{r, out.width="100%", fig.cap="Contour lines"}
+plot(dem, reset = FALSE)
+plot(st_geometry(dem_contour), col = "red", add = TRUE)
+```
+
+## Raster → Polygons
+
+* The `rasterToPolygons` function makes the **Raster→Polygons** conversion
+* Similarly to `rasterToPoints`, the function creates a **polygon** in place of each raster **pixel**, except for `NA` pixels
+* A useful option `dissolve=TRUE` **dissolves** all polygons that have the same raster value into a single feature
+* Note: the `rgeos` package needs to be installed to use `dissolve=TRUE`
+
+* Plot - 
+
+```{r, out.width="100%", fig.cap="Raster to polygons"}
+plot(l, rgb = c(3, 2, 1), reset = FALSE)
+plot(st_geometry(pol), border = "yellow", add = TRUE)
+```
+
+* Next, we subset only those polygons with **area** >1 $km^2$ -
+
+```{r}
+pol$area = st_area(pol)
+pol
+```
+
+```{r}
+library(units)
+
+large = pol$area > set_units(1, "km^2")
+pol = pol[large, ]
+pol
+```
+
+The subset of large polygons can be plotted with the following code. The result is shown in Figure \@ref(fig:forests-large). 
+
+```{r forests-large, out.width="100%", fig.cap="Large polygons"}
+plot(l, rgb = c(3, 2, 1), reset = FALSE)
+plot(st_geometry(pol), border = "yellow", add = TRUE)
+plot(st_geometry(towns), col = "red", pch = 16, add = TRUE)
+text(st_coordinates(towns), towns$name, pos = 3, col = "white")
+```
+
+## Selecting k-nearest points
+
+Our goal is to select the two large polygons corresponding to Lahav and Kramim forests. We can do that in two steps: 
+
+* **Sort** the polygons by distance to Lahav Kibbutz
+* **Select** the first two
+
+First, we create a distance matrix between the towns and the polygons:
+
+```{r}
+dist_towns = st_distance(towns, pol, byid = TRUE)
+dist_towns
+```
+
+Second, we determine the nearest polygon IDs:
+
+```{r}
+dist_order = order(dist_towns[1, ])
+```
+
+```{r}
+dist_order
+```
+
+```{r}
+dist_order[1:2]
+```
+
+Third, we use the IDs to subset the polygons:
+
+```{r}
+forests = pol[dist_order[1:2], ]
+forests
+```
+
+* For convenience, we can add forest names:
+
+```{r}
+forests$name = c("Lahav", "Kramim")
+forests
+```
+
+A plot of the final layer, representing Lahav and Kramim forests, is given in Figure \@ref(fig:forests-final-2). 
+
+```{r forests-final-2, warning=FALSE, out.width="100%", fig.cap="Lahav and Kramim forests"}
+plot(l, rgb = c(3, 2, 1), reset = FALSE)
+plot(st_geometry(forests), border = "yellow", add = TRUE)
+text(st_coordinates(st_centroid(forests)), forests$name, col = "white", font = 2)
+```
+
+## Shifting vector layer
+
+For more convenient **label placement** we can shift forest centroids 3 km to the north. This is an example of shifting vector layers along the x and y axes, by adding a numeric vetor of the form `c(x_offset, y_offset)`. To shift the forest centroids by 3000 CRS units (meters) to the north, we add the vector `c(0, 3000)`. 
+
+First, we create a layer of the centroids:
+
+```{r}
+forests_ctr = st_centroid(forests)
+```
+
+Here are their coordinates:
+
+```{r}
+st_coordinates(forests_ctr)
+```
+
+Then we add the vector `c(0, 3000)` to it:
+
+```{r}
+forests_ctr = st_geometry(forests_ctr) + c(0, 3000)
+```
+
+Inspecting the coordinates now shows they were indeed modified:
+
+```{r}
+st_coordinates(forests_ctr)
+```
+
+The following code produces the forests map with shifted labels. The result is shown in Figure \@ref(fig:shifted-labels). 
+
+```{r shifted-labels, out.width="100%", fig.cap="Shifted labels"}
+plot(l, rgb = c(3, 2, 1), reset = FALSE)
+plot(st_geometry(forests), border = "yellow", add = TRUE)
+text(st_coordinates(forests_ctr), forests$name, col = "white", font = 2)
+```
+
+## Extracting values to polygons
+
+* When **extracting** raster values based on a polygon (or line) layer, each feature may intersect an **unequal** number of pixels
+* The `extract` function offers two ways of dealing with this variation - 
+    * **Summarizing** the values to a single value per feature, using a function (`fun`), so that the returned object is a vector (single layer raster) or a matrix (multi-layer raster)
+    * **Keeping** all values in a `list`, using `fun=NULL`
+* The `na.rm` parameter determines whether `NA` values are **passed** to the function
+
+* For example, the following expression calculates the **average** `r` value for each **feature** in `forests`, that is the average NDVI time series per forest - 
+
+```{r}
+r_forests = aggregate(r, forests, FUN = mean, na.rm = TRUE)
+r_forests = r_forests[[1]]
+```
+
+* The result is a `matrix` with `r nrow(r_forests)` **rows** (features) and `r ncol(r_forests)` **columns** (raster layers)
+
+```{r}
+dim(r_forests)
+```
+
+```{r}
+r_forests[, 1:3]
+```
+
+* We will **transform** the `matrix` to a more convenient `data.frame`, using `t` and `as.data.frame` - 
+
+```{r}
+r_forests = as.data.frame(t(r_forests))
+```
+
+```{r}
+head(r_forests)
+```
+
+* Also, we will assign forest **names** to the columns -
+
+```{r}
+colnames(r_forests) = forests$name
+```
+
+```{r}
+head(r_forests)
+```
+
+* And add a **date** column -
+
+```{r}
+r_forests$date = dates$date
+```
+
+```{r}
+head(r_forests)
+```
+
+* Now we can plot the **NDVI time series** of both forests - 
+
+```{r, fig.width=9, fig.height=5, out.width="100%", fig.cap="Average NDVI time series for Lahav and Kramim forests"}
+plot(
+  dates$date,
+  r_forests$Lahav,
+  type = "l",
+  col = "blue",
+  xlab = "Time",
+  ylab = "NDVI"
+)
+lines(
+  dates$date,
+  r_forests$Kramim,
+  type = "l",
+  col = "red"
+)
+```
+
+## Distance to nearest point
+
+* Another example of a spatial operator involving a raster and a vector layer is the calculation of a raster of **distances to nearest** point
+* The raster can be **calculated** using the `distanceFromPoints` function, given a raster and a point layer - 
+
+```{r}
+grid = st_as_sf(modis_avg, as_points = TRUE)
+distance = st_distance(grid, rainfall)
+distance = apply(distance, 1, min)
+grid$distance = distance
+distance = st_rasterize(grid[, "distance"], modis_avg)
+```
+
+* Plot - 
+
+```{r, fig.width=3.8, fig.height=6, out.width="43%", fig.cap="Distance to nearest meteorological station"}
+plot(distance, reset = FALSE)
+plot(st_geometry(rainfall), col = "red", add = TRUE)
+```
+
+
+
+
+
+
+
+
+
+

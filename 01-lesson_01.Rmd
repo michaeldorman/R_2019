@@ -1,0 +1,603 @@
+# The R environment {#the-r-environment}
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(fig.align = 'center', collapse = TRUE, R.options = list(width = 80))
+```
+
+## Programming
+
+### Why is programming necessary?
+
+Is this (Figure \@ref(fig:csv-icon)) a **Microsoft Excel** spreadsheet? 
+
+```{r csv-icon, echo=FALSE, fig.cap="CSV file", out.width="50%"}
+knitr::include_graphics("images/lesson_01_csv_icon.png")
+```
+
+The file has an Excel icon, and it opens in Excel on double-click (Figure \@ref(fig:csv-in-excel)). 
+
+```{r csv-in-excel, echo=FALSE, fig.cap="CSV file opened in Excel", out.width="100%"}
+knitr::include_graphics("images/lesson_01_csv_excel.png")
+```
+
+However, this is in fact a **plain-text** file in the **Comma Separated Values** (CSV) format, and can be opened in various other software, such as Notepad (Figure \@ref(fig:csv-in-notepad)). 
+
+```{r csv-in-notepad, echo=FALSE, fig.cap="CSV file opened in Notepad", out.width="100%"}
+knitr::include_graphics("images/lesson_01_csv_notepad.png")
+```
+
+The graphical interface "protects" us from the little details:
+
+* Hiding the `.csv` file **extension**
+* Displaying an Excel **icon**
+* Automatically **opening** the file in Excel
+
+Is this a *bad* thing? Often, it is:
+
+* We can be unaware of the fact that the file can be opened in software other than Excel
+* In general - the "ordinary" interaction with the computer is limited to clicking on links, selecting from menus and filling dialog boxes
+* The latter approach suggests there are "boundaries" set by the computer interface for the user who wishes to accomplish a given task
+* Of course the opposite is true - the user has full control, and can tell the computer exactly what he wants to do
+
+Question: how can we **change** the value of a particular raster **cell**, such as the `[120, 120]` cell?
+
+```{r, echo=FALSE, fig.cap="The `rainfall.tif` raster", out.width="100%"}
+knitr::include_graphics("images/lesson_01_rainfall_raster_qgis.png")
+```
+
+In **ArcGIS** (excluding the use of ArcPy), to change the value of an individual pixel we would have to go through the following steps:
+
+* Open the raster with "Add Data"
+* Convert the raster to points
+* Calculate row and column indices
+* Locate the point we want to change and edit its attribute
+* Convert the points to back to a raster, using the same extent and resolution and setting a snap raster
+* Export the raster
+
+```{r, echo=FALSE, fig.cap="Raster to points in ArcGIS^[https://support.esri.com/en/technical-article/000010981]", out.width="100%"}
+knitr::include_graphics("images/lesson_01_arcgis_raster_to_points.png")
+```
+
+In **R**, the process is much more straightforward:
+
+* Loading the `stars` package
+* Reading the `rainfall.tif` raster
+* Assigning a new value to the `[120, 120]` cell
+* Writing the raster to disk
+
+```{r, eval=FALSE}
+library(stars)
+r = read_stars("data/rainfall.tif")
+r[[1]][120, 120] = 1000
+writeRaster(r, "rainfall2.tif")
+```
+
+It is worth mentioning that an analogous workflow exists in **Python**:
+
+```{python, eval=FALSE}
+import gdalnumeric
+r = gdalnumeric.LoadFile("rainfall.tif")
+r[119, 119] = 1000
+gdalnumeric.SaveArray(r, "rainfall2.tif", format = "GTiff", prototype = "rainfall.tif")
+```
+
+### What is programming
+
+A **computer program** is a sequence of text instructions that can be "understood" by a computer and executed. A **programming language** is a machine-readable artificial language designed to express computations that can be performed by a computer. Programming is the preferred way for giving instructions to the computer because that way:
+
+* We break free from the **limitations** of the graphical interface, and are able to perform tasks that are unfeasible or even impossible
+* We can keep the code for **editing** and **re-use** in the future, and as a reminder to ourselves of what we did in the past
+* Sharing a **precise** record of our analysis with others, making our results reproducible
+
+### Computer hardware
+
+When learning programming in R, at times we will refer to specific components of the computyer hardware. Here are the main ones:
+
+* The **Central Processing Unit (CPU)** performs (simple) calculations very fast
+* The **Random Access Memory (RAM)** is a short-term fast memory
+* **Mass Storage** (e.g. hard drive) is long-term and high-capacity memory, but slow
+* A **Keyboard** is an example of an input device
+* A **Screen** is an example of an output device
+
+```{r, echo=FALSE, fig.cap="Components of a computing environment", out.width="90%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_01_computer_components.svg")
+```
+
+### Abstraction and execution models
+
+Programming languages differ in two main aspects: their level of abstraction and their execution models. 
+**Abstraction** is the presentation of data and instructions which hide implementation detail. Abstraction is what lets the programmer focus on the task at hand, ignoring the small technical details (Figure \@ref(fig:abstraction)). **Low-level** programming languages provide little or no abstraction. The advantage is efficient memory use and therefore fast execution, but the disadvantage is that such languages are difficult to use, because of the many technical details the programmer needs to know. **High-level** programming languages provide more abstraction and automatically handle various aspects, such as memory use. The advantage of high-level languages is that they are more "understandable" and easier to use. The disadvantage is that high-level languages can be less efficient and therefore slower. 
+```{r abstraction, echo=FALSE, fig.cap="Increasing abstraction from Assembly to C++ to R", out.width="100%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_01_abstraction.svg")
+```
+
+**Execution models** are systems for execution of programs written in a given programming language. In **compiled** execution models, before being executed the code needs to be compiled into executable machine code. In compiled execution models, the code is first translated to an executable file (Figure \@ref(fig:compiled1)). Subsequently, the executable file can then be run (Figure \@ref(fig:compiled2)). In **interpreted** execution models, the code can be run directly, using the **interpreter** (Figure \@ref(fig:interpreted1)). The advantage of the interpretation approach is that it is easier to develop and use the language. The disadvantage, again, is lower efficiency. 
+
+```{r compiled1, echo=FALSE, fig.cap="Compilation of C++ code", out.width="100%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_01_compiled1.svg")
+```
+
+```{r compiled2, echo=FALSE, fig.cap="Running an executable file", out.width="100%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_01_compiled2.svg")
+```
+
+```{r interpreted1, echo=FALSE, fig.cap="Running R code", out.width="100%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_01_interpreted.svg")
+```
+
+R (along with Python, and other languages) belongs in the group of high-level interpreted languages (Figure \@ref(fig:language-classification)). 
+
+```{r language-classification, echo=FALSE, fig.cap="Programming languages classification based on abstraction level and execution model", out.width="100%"}
+knitr::include_graphics("images/lesson_01_programming_languages_matrix.jpg")
+```
+
+### Object-oriented programming
+
+The interaction with the computer takes places through **objects**. Each object belongs to a **class**: an abstract structure with certain properties. Objects are in fact **instances** of a class.
+
+The class comprises a template which sets the **properties** and **methods** each object of that class should have, while an object contains specific values for that particular instance. For example:
+
+* All cars we see in the parking lot are instances of the "car" class
+* The "car" class has certain properties (manufacturer, color, year) and methods (start, drive, stop)
+* Each "car" object has specific values for the properties (Suzuki, brown, 2011)
+
+```{r, echo=FALSE, fig.cap="An object^[https://www.w3schools.com/js/js_objects.asp]", out.width="100%"}
+knitr::include_graphics("images/lesson_01_js_object.png")
+```
+
+```{r}
+library(stars)
+r = read_stars("data/rainfall.tif")
+r
+```
+
+### Inheritance
+
+One of the implications of object-oriented programming is **inheritance**. Inheritance makes it possible for one class to "extend" another class, by adding new properties and/or new methods. For example: 
+
+* A "taxi" class is an extension of the "car" class
+* A "taxi" has new properties (taxi company name), and new methods (switching the taximeter on and off)
+
+```{r}
+str(r)
+```
+
+## The R environment
+
+### Starting R
+
+To use R we first need to install it. R can be downloaded from the [R-project website](https://www.r-project.org/). The current version is [3.6.1](https://cloud.r-project.org/bin/windows/base/R-3.6.1-win.exe). Once R is installed, we can open the default interface (RGui) with Start → All Programs → R → R x64 3.61 (Figure \@ref(fig:rgui)).
+
+```{r rgui, echo=FALSE, fig.cap="RGui", out.width="100%"}
+knitr::include_graphics("images/lesson_01_rgui.png")
+```
+
+We will be working with R through a more advanced interface than the default one, called RStudio. It can be downloaded from the company [website](https://www.rstudio.com/). The current version is [1.2.1335](https://download1.rstudio.org/desktop/windows/RStudio-1.2.1335.exe). Once both R and RStudio are installed, we can open Rstudio with Start → All Programs → RStudio → RStudio (Figure \@ref(fig:rstudio)).
+
+```{r rstudio, echo=FALSE, fig.cap="RStudio", out.width="100%"}
+knitr::include_graphics("images/lesson_01_rstudio.png")
+```
+
+In this lesson we will only work with the **console** (Figure \@ref(fig:rstudio-console)), i.e. the command line. In the following lessons we will also work with other RStudio panels. 
+
+```{r rstudio-console, echo=FALSE, fig.cap="RStudio console", out.width="80%"}
+knitr::include_graphics("images/lesson_01_rstudio_console.png")
+```
+
+## Basic R expressions
+
+### Console input and output
+
+We can type expressions at the command line and press **Enter**. For example, let's type the expression `1+3+5+7`:
+
+```{r}
+1 + 3 + 5 + 7
+```
+
+The expression `1+3+5+7` was sent to the processor, and the result `r 1+3+5+7` was printed in the console. (Later on we will discuss the `[1]` part). Note: the value `r 1+3+5+7` is not kept in in the RAM or Mass Storage, just printed on screen. 
+
+```{r, echo=FALSE, fig.cap="In memory", out.width="100%", auto.pdf=TRUE}
+knitr::include_graphics("images/lesson_01_in_memory.svg")
+```
+
+The input and output appears like this in the slides:
+
+```{r}
+1 + 3 + 5 + 7
+```
+
+The way it input and output appear in RStudio is shown in Figure \@ref(fig:rstudio-input-output). 
+
+```{r rstudio-input-output, echo=FALSE, fig.cap="RStudio console input and output", out.width="25%"}
+knitr::include_graphics("images/lesson_01_console_screenshot.png")
+```
+
+We can type a number, the number itself is returned:
+
+```{r}
+600
+```
+
+We can type text inside single `'` or double `"` quotes:
+
+```{r}
+"Hello"
+```
+
+Both of these are constant values, `numeric` or `text`, the simplest type of expressions in R. 
+
+### Arithmetic operators
+
+Through interactive use of the command line we can experiment with basic operators in R. For example, R includes the standard **arithmetic operators** (Table \@ref(tab:arithmetic-operators)). 
+
+| Operator | Meaning |
+|---|---|
+| `+` | Addition |
+| `-` | Subtraction |
+| `*` | Multiplication |
+| `/` | Division |
+| `^` | Exponent |
+
+Table: (\#tab:arithmetic-operators) Arithmetic operators
+
+For example:
+
+```{r}
+5 + 3
+4 - 5
+1 * 10
+1 / 10
+10 ^ 2
+```
+
+Note: We can use the up ↑ and down ↓ keys to scroll through the executed expressions history. 
+
+Very large or very small numbers are formatted in **exponential** notation:
+
+```{r}
+1 / 1000000 # 1*10^-6
+```
+
+```{r}
+7 * 100000  # 7*10^5
+```
+
+**Infinity** is treated as a special numeric value `Inf` or `-Inf`:
+
+```{r}
+1 / 0
+```
+
+```{r}
+-1 / 0
+```
+
+```{r}
+Inf + 1
+```
+
+```{r}
+-1 * Inf
+```
+
+We can control operator precedence with **brackets**, just like in math. This is recommended for clarity even where not strictly required:
+
+```{r}
+2 * 3 + 1
+```
+
+```{r}
+2 * (3 + 1)
+```
+
+### Spaces and comments
+
+The interpreter ignores everything to the right of number sign `#`:
+
+```{r}
+1 * 2 # * 3
+```
+
+It is therefore used for code comments:
+
+```{r}
+# Multiplication example
+5 * 5
+```
+
+The interpreter ignores spaces, so the following expressions are treated exactly the same way:
+
+```{r}
+1 + 1
+```
+
+```{r}
+1+1
+```
+
+```{r}
+1+           1
+```
+
+We can type **Enter** in the middle of an expression and keep typing on the next line. The interpreter displays the `+` symbol, which means that the expression is incomplete:
+
+```{r}
+5 * 
+2
+```
+
+```{r, echo=FALSE, fig.cap="Incomplete expression", out.width="20%"}
+knitr::include_graphics("images/lesson_01_console_next_line.png")
+```
+
+We can also: 
+
+* Exit from the "completion" state by pressing **Esc**
+* Browse previous expressions using the up (↑) and down (↓) arrows
+* The console can be cleared with **Ctrl+L**
+
+### Conditional operators
+
+**Conditions** are expression that use **conditional operators** and have a yes/no result, i.e. the condition can be either true or false. The result of a condition is a **logical** value, `TRUE` or `FALSE`: 
+
+* `TRUE` means the expression is true
+* `FALSE` means the expression is false
+* (`NA` means it is unknown)
+
+The conditional operators in R are listed in Table \@ref(tab:conditional-operators). 
+
+| Operator | Meaning |
+|---|---|
+| `==` | Equal |
+| `>` | Greater than |
+| `>=` | Greater than or equal |
+| `<` | Less than |
+| `<=` | Less than or equal |
+| `!=` | Not equal |
+| `&` | And |
+| `|` | Or |
+| `!` | Not |
+
+Table: (\#tab:conditional-operators) Conditional operators
+
+For example, we can use conditional operators to compare numeric values:
+
+```{r}
+1 < 2
+1 > 2
+2 > 2
+2 >= 2
+2 != 2
+```
+
+"Equal" (`==`) and "not equal" (`!=`) are opposites of each other, since a pair of values can be either equal or not:
+
+```{r}
+1 == 1
+1 == 2
+```
+
+```{r}
+1 != 1
+1 != 2
+```
+
+The "and" (`&`) and "or" (`|`) operators are used to create more complex conditions. "And" (`&`) returns `TRUE` when both sides are `TRUE`:
+
+```{r}
+(1 < 10) & (10 < 100)
+(1 < 10) & (10 > 100)
+```
+
+"Or" (`|`) returns `TRUE` when at least one of the sides is `TRUE`:
+
+```{r}
+(1 < 10) | (10 < 100)
+(1 < 10) | (10 > 100)
+```
+
+The last conditional operator is "not" (`!`), which reverses `TRUE` to `FALSE` and `FALSE` to `TRUE`:
+
+```{r}
+1 == 1
+!(1 == 1)
+```
+
+```{r}
+(1 == 1) & (2 == 2)
+(1 == 1) & !(2 == 2)
+```
+
+> Run the following expression and explain their result.
+> 
+> `FALSE == FALSE`
+> 
+> `!(TRUE == TRUE)`
+> 
+> `!(!(1 == 1))`
+
+### Special values
+
+R has several special values, as listed in Table \@ref(tab:special-values). 
+
+| Value | Meaning |
+|---|---|
+| `Inf` | Infinity |
+| `NA` | Not Available |
+| `NaN` | Not a Number |
+| `NULL` | Empty object |
+
+Table: (\#tab:special-values) Special values in R
+
+For example: 
+
+```{r}
+1/0
+```
+
+```{r}
+NA + 3
+```
+
+```{r}
+0/0
+```
+
+```{r}
+NULL
+```
+
+### Functions
+
+In math, a **function** is a relation that associates each element x of a set X, to a single element y of another set Y. For example, the function $y=2x$:
+
+```{r, echo=FALSE, fig.cap="A function", out.width="40%"}
+knitr::include_graphics("images/lesson_01_programming_function.png")
+```
+
+* The concept of functions in programming is similar - 
+    * A function is a code piece that "knows" how to do a certain **task**
+    * Executing the function is known as a **function call**
+    * The function accepts zero or more objects as **input** (e.g. `2`) and returns a single object as output (e.g. `4`), possibly also doing other things known as **side effects**
+    * The number and type of inputs the function needs are determined in the function definition; these are known as the function **parameters** (e.g. a single number)
+    * The objects the function received in practice, as part of a particular function call, are known as **arguments** (e.g. `2`)
+
+* A function is basically a set of pre-defined **instructions** 
+* There are thousands of **built-in** functions in R 
+* Later on we will learn to **define** our own functions
+
+```{r, echo=FALSE, fig.cap="From Chambers 2014, Statistical Science (https://arxiv.org/pdf/1409.3531.pdf)", out.width="75%", auto.pdf=TRUE}
+knitr::include_graphics("images/Chambers2014a.svg")
+```
+
+```{r}
+`+`(5, 5)
+```
+
+* A **function call** is composed of the function name, followed by the arguments inside brackets `()` and separated by commas `,` -
+
+```{r}
+sqrt(4)
+```
+
+* The `sqrt` function received a single argument `4` and returned its square root `2`
+
+### Error messages
+
+* Consider the following expressions - 
+
+```{r}
+sqrt(16)
+```
+
+```{r, error=TRUE}
+sqrt("a")
+```
+
+```{r, error=TRUE}
+sqrt(a)
+```
+
+* In the previous slide we got two **error messages**, because the last two expressions were illegal, i.e. not in agreement with the syntax rules of R
+* The **first error** was occurred because we tried to run a mathematical operation `sqrt` on a text value `"a"`
+* The **second error** occurred because we tried to use a non-existing object `a`. And text without quotes is treated as a name of an object, i.e. a label for an actual object stored in RAM. Since we don't have an object named `a` we got an error.
+
+### Pre-loaded objects
+
+* When starting R, a default set of **objects** is loaded into the RAM, such as `TRUE`, `FALSE`, `sqrt` and `pi`
+* Type `pi` and see what happens - 
+
+```{r}
+pi
+```
+
+### Decimal places
+
+* Is the value of PI stored in memory really equal to `3.141593`? 
+
+```{r}
+pi == 3.141593
+```
+
+* If not, what is the difference?
+
+```{r}
+pi - 3.141593
+```
+
+* The reason is that by default R prints only the first 7 digits
+
+```{r}
+options()$digits
+```
+
+### Case-sensitivity
+
+* R is **case-sensitive**, it distinguishes between lower-case and upper-case letters
+* For example, `TRUE` is a logical value, but `True` and `true` are undefined - 
+
+```{r}
+TRUE
+```
+
+```{r, error=TRUE}
+True
+```
+
+```{r, error=TRUE}
+true
+```
+
+### Classes
+
+* R is an object-oriented language, where each object belongs to a **class**
+* The `class` functions accepts an object and returns the **class name** -
+
+```{r}
+class(TRUE)
+class(1)
+class(pi)
+class("a")
+class(sqrt)
+```
+
+* Question: explain the returned value of the following expressions - 
+
+```{r}
+class(1 < 2)
+```
+
+```{r}
+class("logical")
+```
+
+```{r}
+class(1) == class(2)
+```
+
+* Question: explain the returned value of the following expressions - 
+
+```{r}
+class(class)
+```
+
+```{r}
+class(class(sqrt))
+```
+
+```{r}
+class(class(1))
+```
+
+### Using help files
+
+* Every built-in object is associated with a **help document**, which can be accessed using the `help` function or the `?` operator - 
+
+```{r}
+# help(class)
+# ?class
+# ?TRUE
+# ?pi
+```
+
+

@@ -1,0 +1,9 @@
+book_filename: "bookdown-r"
+language:
+  ui:
+    chapter_name: "Chapter "
+delete_merged_file: true
+#rmd_files:
+#  html: ["index.Rmd", "01-lesson_01.Rmd", "02-lesson_02.Rmd", "03-lesson_03.Rmd", "04-lesson_04.Rmd", "05-lesson_05.Rmd", "06-lesson_06.Rmd", "07-lesson_07.Rmd", "08-lesson_08.Rmd", "09-#lesson_09.Rmd", "10-lesson_10.Rmd", "11-lesson_11.Rmd", "12-lesson_12.Rmd", "13-lesson_13.Rmd", "15-files.Rmd", "21-general-information.Rmd", "31-exam.Rmd"]
+#  latex: ["index.Rmd", "01-lesson_01.Rmd", "02-lesson_02.Rmd", "03-lesson_03.Rmd", "04-lesson_04.Rmd", "05-lesson_05.Rmd", "06-lesson_06.Rmd", "07-lesson_07.Rmd", "08-lesson_08.Rmd", "09-#lesson_09.Rmd", "10-lesson_10.Rmd", "11-lesson_11.Rmd", "12-lesson_12.Rmd", "13-lesson_13.Rmd", "15-files.Rmd"]
+

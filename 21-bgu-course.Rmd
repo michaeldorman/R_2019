@@ -1,0 +1,176 @@
+# BGU course 2019
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(fig.align = 'center', collapse = TRUE, R.options = list(width = 80))
+```
+
+## Course aims
+
+* General knowledge in programming
+* Overview of spatial data processing and analysis in R
+
+## Course topics
+
+**Part I - Introduction to R programming**
+
+1. The R environment
+2. Vectors
+3. Time series + function definition
+4. Tables + conditionals and loops
+
+**Part II - Processing and analysis of spatial data in R**
+
+5. Matrices and rasters
+6. Raster algebra
+7. Vector layers
+8. Geometric operations with vector layers
+9. Geometric operations with rasters
+10. Working with spatio-temporal data
+11. Combining rasters and vector layers
+12. Spatial interpolation of point data
+
+## Course details
+
+* **Course number**: 128.1.0043
+* **Time**: Sunday 16:10-19:00
+* **Place**: Building 72, room 249
+* **Instructor**: Michael Dorman (dorman@post.bgu.ac.il)
+* **Grading**: 6 exercises (50%) + Exam (50%)
+* **Requirements** - 
+    * Basic knowledge of GIS (e.g. "Intro to GIS" course)
+    * Self study
+* **Getting help** - 
+    * Forum on **Moodle** (http://moodle2.bgu.ac.il)
+    * Meetings (Monday 15:00-16:00, schedule by e-mail)
+
+## Lecture plan
+
+| Lesson | Date | Slides | Exercise |
+|:--:|:---:|-----------|:-----------:|
+| 01 | 2019-10-27 | [**The R environment**](the-r-environment.html) | |
+| 02 | 2019-11-03 | [**Vectors**](exercises/vectors.html) | [**Exercise 1**](exercises/exercise_01.pdf) | 
+| 03 | 2019-11-10 | [**Time series and function definitions**](time-series-and-function-definitions.html) | | 
+| 04 | 2019-11-17 | [**Tables, conditionals and loops**](tables-conditionals-and-loops.html) | [**Exercise 2**](exercises/exercise_02.pdf) | 
+| 05 | 2019-11-24 | [**Matrices and rasters**](matrices-and-rasters.html) | | 
+| 06 | 2019-12-01 | [**Raster algebra**](raster-algebra.html) | [**Exercise 3**](exercises/exercise_03.pdf) | 
+| 07 | 2019-12-08 | [**Vector layers**](vector-layers.html) | | 
+| 08 | 2019-12-15 | [**Geometric operations with vector layers**](geometric-operations-with-vector-layers.html) | [**Exercise 4**](exercises/exercise_04.pdf) | 
+| 09 | 2019-12-22 | [**Geometric operations with rasters**](geometric-operations-with-rasters.html) | | 
+| 10 | 2020-01-05 | [**Working with spatio-temporal data**](processing-spatio-temporal-data.html) | [**Exercise 5**](exercises/exercise_05.pdf) | 
+| 11 | 2020-01-12 | [**Combining rasters and vector layers**](combining-rasters-and-vector-layers.html) | | 
+| 12 | 2020-01-19 | [**Spatial interpolation of point data**](spatial-interpolation-of-point-data.html) | [**Exercise 6**](exercises/exercise_06.pdf) | 
+
+## Exercise submission dates
+
+| Exercise | Date |
+|:--:|:---:|
+| 01 | 2019-11-17 |
+| 02 | 2019-12-01 |
+| 03 | 2019-12-15 |
+| 04 | 2020-01-05 |
+| 05 | 2020-01-19 |
+| 06 | 2020-02-02 |
+
+## Exercise instructions
+
+### Guidelines
+
+* Submission in through **Moodle** only
+* The submission should be a **single R code file**
+* File name is your **last name** + **exercise number**, such as `dorman_01.R`
+* The code needs to run **as is**, assuming that - 
+    * All required packages are **installed**
+    * All data files are in the user's **working directory**
+* **Do not** include `install.packages` expressions
+* **Do** include `library` expressions
+* **Do not** include `setwd` expressions
+* Self-check - 
+    * Start a new R **session**
+    * **Manually** set the **working directory** to where the data files are
+    * **Run** the entire script
+* **Late** submission up to -20% and additional -10% per week, unless coordinated in advance
+
+```{r, eval=FALSE}
+# Exercise 01
+# Michael Dorman
+
+library(raster)
+
+# Question 01
+r = raster("elevation.tif")
+plot(r)
+
+# Question 02
+...
+```
+
+
+### Generality
+
+* The code needs to be as **general** as possible - 
+    * Do not use **specific values** except the ones given in the question
+    * When there are **intermediate results** - assign them to a variable and use the variable, not the value
+
+* Question: what is the last value of `c(5,3,1,7,2,3,2,6)`?
+* Good solution - 
+
+```{r}
+x = c(5,3,1,7,2,3,2,6)
+x[length(x)]
+```
+
+* Bad solution - 
+
+```{r}
+x = c(5,3,1,7,2,3,2,6)
+x[8]
+```
+
+### Brackets
+
+* Use **brackets** to make sure the right order of operations is done
+
+* Question: print the subset of the last four values in `c(5,3,1,7,2,3,2,6)`
+* Correct solution - 
+
+```{r}
+x = c(5,3,1,7,2,3,2,6)
+x[(length(x)-3):length(x)]
+```
+
+* Wrong solution - 
+
+```{r}
+x = c(5,3,1,7,2,3,2,6)
+x[length(x)-3:length(x)]
+```
+
+### Required value or output
+
+* Note which **outputs** or **printouts** are requested
+
+### Packages
+
+* The `sp`, `rgeos`, `rgdal` and `raster` cannot be used in the exercises. 
+
+## Other resources
+
+### Tutorials
+
+* Adrian Baddeley, 2008. **Analysing spatial point patterns in R**. [[**PDF**](resources/PointPatterTutorial.pdf)]
+
+### Papers
+
+* Pebesma, E., Bivand, R. S. (2005). **Classes and Methods for Spatial Data: the sp Package**. R news, 5(2), 9-13. [[**PDF**](resources/Rnews_2005-2.pdf)]
+* Pebesma, E. (2018). **Simple Features for R: Standardized Support for Spatial Vector Data**. The R Journal, 10(1):439-446. [[**PDF**](resources/RJ-2018-009.pdf)]
+
+### Books - General
+
+* Murrell, P. (2010). **Introduction to Data Technologies**. Chapman and Hall/CRC. [[**PDF**](resources/Murrell 2010 Introduction to Data Technologies.pdf)] [[**Website**](https://www.stat.auckland.ac.nz/~paul/ItDT/)]
+* Wickham, H. (2014). **Advanced R**. Chapman and Hall/CRC. [[**HTML**](http://adv-r.had.co.nz/)]
+
+### Books - Spatial data
+
+* Hengl, T. (2009). **A Practical Guide to Geostatistical Mapping**. [[**PDF**](resources/Hengl 2009 A Practical Guide to Geostatistical Mapping.pdf)]
+* Lovelace, R., Nowosad, J., Muenchow, J. (2019). **Geocomputation with R**. Chapman and Hall/CRC. [[**HTML**](https://geocompr.robinlovelace.net/)]
+* Pebesma, E., Bivand, R. (in preparation). **Spatial Data Science**. [[**HTML**](https://keen-swartz-3146c4.netlify.com/)]

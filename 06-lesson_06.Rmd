@@ -15,9 +15,13 @@ knitr::opts_chunk$set(fig.align = 'center', collapse = TRUE, R.options = list(wi
 In most of the examples in this Chapter, we are going to use the `MOD13A3_2000_2019.tif` raster which we already met in Section \@ref(rasters). Let's read it into memory:
 
 ```{r}
+library(stars)
+
 r = read_stars("data/MOD13A3_2000_2019.tif")
 names(r) = "NDVI"
 ```
+
+Keep in mind this is a raster time series, where the "layers" refer to NDVI images taken in different times. 
 
 The stars subset operator `[` works as follows:
 
@@ -164,35 +168,36 @@ plot(s, text_values = TRUE)
 
 ## Raster algebra
 
+### Arithmetic and logical operations on layers
+
 Often we have one or more overlapping rasters, and we want to apply the same operation on all pairs, triplets, etc. of overlapping pixels (Figure \@ref(fig:raster-algebra)). 
 
 ```{r raster-algebra, echo=FALSE, fig.cap="Raster algebra^[http://rpubs.com/etiennebr/visualraster]", out.width="100%"}
 knitr::include_graphics("images/lesson_06_raster_algebra.svg")
 ```
 
-* In **raster algebra**, we can use different operators - 
-    * Arithmetic: `+`, `-`, `*`, `/`
-    * Logical: `<`, `<=`, `>`, `>=`, `==`, `!=`, `!`
-    * Certain functions: `abs`, `round`, `ceiling`, `floor`, `trunc`, `sqrt`, `log`, `log10`, `exp`, `cos`, `sin`, `max`, `min`, `range`, `prod`, `sum`, `any`, `all`
-* On each pair (triplet, etc.) of overlapping rasters, to get a **new raster** where each pixel value is the result of the given **operation** on the **overlapping pixels** in the input rasters
-* The operation can also include rasters and `numeric` values, as long as the first argument is a raster
+In **raster algebra**, we can use different operators - 
 
-https://cran.r-project.org/web/packages/raster/vignettes/Raster.pdf
+* Arithmetic: `+`, `-`, `*`, `/`
+* Logical: `<`, `<=`, `>`, `>=`, `==`, `!=`, `!`
+* Certain functions: `abs`, `round`, `ceiling`, `floor`, `trunc`, `sqrt`, `log`, `log10`, `exp`, `cos`, `sin`, `max`, `min`, `range`, `prod`, `sum`, `any`, `all`
 
-* For example: 
+on each pair (triplet, etc.) of overlapping rasters, to get a new raster where each pixel value is the result of the given operation on the overlapping pixels in the input rasters. The operation can also include rasters and `numeric` values, as long as the first argument is a raster. 
+
+For the next few examples, let's create two single-band rasters named `x` and `y`: 
 
 ```{r}
 x = r[, , , 1]
 y = r[, , , 2]
 ```
 
-* Here are several examples of **raster algebra** operations - 
+Here are several examples of raster algebra operations:
 
 ```{r}
 plot(x + y)
 ```
 
-A **logical** raster algebra operation produces a `logical` raster, a raster with pixel values `TRUE` and `FALSE`. For example: 
+A *logical* raster algebra operation produces a `logical` raster, a raster with pixel values `TRUE` and `FALSE`. For example: 
 
 ```{r, echo=FALSE, fig.cap="Logical raster algebra operation"}
 plot(1 * (x > 0.5))
@@ -227,7 +232,7 @@ logical raster values `TRUE` and `FALSE` become `1` and `0`, respectively
 
 > What is the *proportion* of `NA` values in `x`? And in `y`?
 
-## Landsat
+### Landsat image
 
 For the following example, let's read another multi-band raster file named `landsat_04_10_2000.tif`. This is a part of a **Landsat-5** satellite image with bands 1-5 and 7, after radiometric and atmospheric corrections. The raster values represent spectral **reflectance**, therefore all values are in the range 0-1
 
@@ -247,21 +252,17 @@ Plot:
 plot(l)
 ```
 
-## True color and false color images
+### True color and false color images
 
-```{r, echo=FALSE, fig.cap="RGB image", out.width="100%"}
+```{r, echo=FALSE, fig.cap="RGB image^[https://datacarpentry.org/organization-geospatial/01-spatial-data-structures-formats/index.html]", out.width="100%"}
 knitr::include_graphics("images/lesson_06_plot_rgb.jpg")
 ```
 
-https://datacarpentry.org/organization-geospatial/01-spatial-data-structures-formats/index.html
-
-```{r, echo=FALSE, fig.cap="Image stretch", out.width="70%"}
+```{r, echo=FALSE, fig.cap="Image stretch^[https://datacarpentry.org/organization-geospatial/01-spatial-data-structures-formats/index.html]", out.width="70%"}
 knitr::include_graphics("images/lesson_06_linear_image_stretch.jpg")
 ```
 
-https://datacarpentry.org/organization-geospatial/01-spatial-data-structures-formats/index.html
-
-* **True color** and **false color** images can be produced with the `plotRGB` function - 
+**True color** and **false color** images can be produced with the `plot` function - 
 
 ```{r, fig.cap="True color (left) and false color (right) images", fig.width=8, fig.height=4.7, out.width="100%"}
 # True color image
@@ -270,7 +271,7 @@ plot(l, rgb = c(3, 2, 1))
 plot(l, rgb = c(4, 3, 2))
 ```
 
-## Raster algebra
+### Calculating NDVI
 
 **NDVI** can be calculated using raster algebra, as the difference between NIR and Red reflectance, divided by their sum:
 
@@ -303,109 +304,137 @@ l_rec[ndvi <= 0.2] = 0
 l_rec[ndvi > 0.2] = 1
 ```
 
-* Question: can we do the above reclassification with a single expression?
-
 ```{r, fig.cap="Original and reclassified NDVI images", fig.width=8, fig.height=5, out.width="100%"}
 plot(c(ndvi, l_rec, along = 3))
 ```
 
+We can do the above reclassification with a single expression, using `cut`:
+
+```{r}
+cut(l_rec, breaks = c(-Inf, 0.2, Inf))
+```
+
+This becomes especially convenient if we have numerous categories or classes. 
+
 ## Generalizing raster algebra with `st_apply`
 
 ### Operating on each pixel
+
+Suppose that we have a small raster named `s`, with two layers:
 
 ```{r}
 s = r[, 100:103, 200:203, 1:2]
 s[[1]]
 ```
 
+and that we would like to add up the two layers, plus a constant value of `10`. We have already seen this is a raster algebra operation that can be achieved with arithmetic operators:
+
 ```{r}
 u = s[,,,1] + s[,,,2] + 10
 u[[1]]
 ```
 
+But what if we want to apply a function on three, ten, or a hundred layers? Specifying each and every layer is impractical in such case. For that, we have a more general raster algebra approach using `st_apply`. The `st_apply` function is very similar to `apply`. It takes an object, the dimension indices we wish to operate on and a function. For example:
+
 ```{r}
-u = st_apply(s, 1:2, function(x) sum(x) + 10)
+u = st_apply(X = s, MARGIN = 1:2, FUN = function(x) sum(x) + 10)
 u[[1]]
 ```
 
-* The `overlay` function makes it possible to apply any **custom**, user-defined, raster algebra function
-* The `fun` parameter determines the **function** which calculates each pixel value given the respective pixel values of the input raster
-* The `fun` function needs to - 
-    * Accept a **vector** of **any length**
-    * And return - 
-        * A **vector** of **length 1**, in which case `overlay` returns a single-band raster, or
-        * A **vector** of (fixed) **length n**, in which case `overlay` returns a multi-band raster with n layers
+The `st_apply` function thus makes it possible to apply any *custom*, user-defined, raster algebra function on any number of layers (or other dimensions). In case the dimension we operate on is `1:2` (i.e., "pixels"), the `FUN` parameter determines the function which calculates each pixel value given the respective pixel values of the input raster. 
 
-* For example, the following code section uses a **custom function** `f` to create a new raster `s` where each pixel value is the **average** of the first 10 layers in `r` (excluding `NA`s)
+The `FUN` function needs to accept a vector of any length and return either one of the following: 
+
+* A **vector** of **length 1**, in which case `st_apply` returns a single-band raster, or
+* A **vector** of (fixed) **length n**, in which case `st_apply` returns a multi-band raster with n layers
+
+For example, the above expression to calculate NDVI:
+
+```{r}
+ndvi = (l[,,,4] - l[,,,3]) / (l[,,,4] + l[,,,3])
+```
+
+
+Can be replaced with the following analogous expression using `st_apply`:
+
+```{r}
+ndvi = st_apply(l, 1:2, function(x) (x[4]-x[3])/(x[4]+x[3]))
+```
+
+
+As another example, the following expression uses `st_apply` along with `FUN=mean` to calculate a new raster with the average NDVI values per pixel. The additional `na.rm=TRUE` argument is passed to the function (`mean`, in this case). This makes the calculation ignore `NA` values:
 
 ```{r}
 s = st_apply(r, 1:2, mean, na.rm = TRUE)
 ```
 
-* Plot - 
+Plot:
 
-```{r, fig.cap="Result of `overlay` with `mean` function and `na.rm=TRUE`", fig.width=7, fig.height=6.85, out.width="70%"}
+```{r, fig.cap="Average NDVI per pixel"}
 plot(s)
 ```
 
-* In the following example we use `fun=range`, which is a function that returns a vector of **length 2** - 
+In the following example we use the `range` function, which is a function that returns a vector of length 2:
 
 ```{r}
 f = function(x) if(!all(is.na(x))) range(x, na.rm = TRUE) else c(NA, NA)
 s = st_apply(r, 1:2, f)
 ```
 
-* Plot - 
+Plot:
 
-```{r, fig.cap="Result of applying the `range` function with `na.rm=TRUE` on each pixel", fig.width=7, fig.height=6.85, out.width="70%"}
+```{r, fig.cap="Minimum and maximum NDVI value per pixel"}
 plot(s)
 ```
 
-* Question: what do you think the result `s` will be?
+> Why does the resulting raster has two layers? What is the meaning of each layer?
 
-* As another example, we can calculate the **difference** between the **maximum** and **minimum** in the first 23 layers of `r` - 
+As another example, we can calculate the difference between the maximum and minimum NDVI, i.e., the observed amplitude of NDVI values, in the raster `r`: 
 
 ```{r}
 f = function(x) if(!all(is.na(x))) diff(range(x, na.rm = TRUE)) else NA
+s = st_apply(r, 1:2, f)
 ```
 
+Note that the function is more complex in this case, to avoid the situation when all values are `NA` and thus a vector of length *one*, rather than two, is returned:
+
 ```{r}
-s = st_apply(r, 1:2, f)
+diff(range(c(NA, NA, NA)))
 ```
 
 * Plot - 
 
-```{r, fig.cap="Result of `overlay` with `max`/`min` difference", fig.width=7, fig.height=6.85, out.width="70%"}
+```{r, fig.cap="Amplitude of NDVI values per pixel"}
 plot(s)
 ```
 
-* Another useful case for `overlay` is calculating the **proportion** of `NA` values per pixel - 
+Another practical use case for `st_apply` is calculating the proportion of `NA` values per pixel:
 
 ```{r}
-f = function(x) if(all(is.na(x))) NA else mean(is.na(x))
+f = function(x) mean(is.na(x))
 s = st_apply(r, 1:2, f)
 ```
 
-* Plot - 
+Plot:
 
-```{r, fig.cap="Result of `overlay`", fig.width=7, fig.height=6.85, out.width="70%"}
+```{r, fig.cap="Proportion of `NA` values per pixel"}
 plot(s)
 ```
 
 ### Operating on each layer
 
-* The `cellStats` function can be used to apply a function on the values of **each layer** in a raster, to get a **vector** of summaries - 
+Another useful mode of operation with `st_apply` is summarizing the properties of each *layer*, rather than each pixel. This is acieved with `MARGIN=3`. For example:
 
 ```{r}
-x = st_apply(r, 3, mean, na.rm = TRUE)
-x1 = st_apply(r, 3, min, na.rm = TRUE)
-x2 = st_apply(r, 3, max, na.rm = TRUE)
+layer_mean = st_apply(r, 3, mean, na.rm = TRUE)
+layer_min = st_apply(r, 3, min, na.rm = TRUE)
+layer_max = st_apply(r, 3, max, na.rm = TRUE)
 ```
 
 ```{r}
-plot(x[[1]], type = "o", ylim = range(r[[1]], na.rm = TRUE), ylab = "NDVI")
-lines(x1[[1]], type = "o", col = "blue")
-lines(x2[[1]], type = "o", col = "red")
+plot(layer_mean[[1]], type = "o", ylim = range(r[[1]], na.rm = TRUE), ylab = "NDVI")
+lines(layer_min[[1]], type = "o", col = "blue")
+lines(layer_max[[1]], type = "o", col = "red")
 ```
 
 

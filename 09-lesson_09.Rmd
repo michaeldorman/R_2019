@@ -16,7 +16,7 @@ knitr::opts_chunk$set(fig.align = 'center', collapse = TRUE, R.options = list(wi
     * Filtering
     * Segmentation
 
-## Geometric component of rasters
+## Merging rasters
 
 * In the next few examples, we will process a **Digital Elevation Model (DEM)** raster of **Haifa**, by - 
     * Mosaicking
@@ -59,82 +59,67 @@ st_bbox(dem1)
 st_bbox(dem2)
 ```
 
-* Rasters can be **mosaicked** using either the `merge` or the `mosaic` function
-* The difference between them is in handling of **overlapping** cells - 
-    * `merge` assigns the value from the **first** raster
-    * `mosaic` calculates the value based on **all** layers, using the specified function (e.g. `mean`)
-* In our case the tiles **do not overlap**, so it does not matter which function we choose - 
+Rasters can be **mosaicked** using the `c` function:
 
 ```{r}
 dem = c(dem1, dem2, along = "x")
 dem = st_set_crs(dem, 4326)
 ```
 
-* Plot - 
+Plot:
 
-```{r, fig.width=8, fig.height=5.4, out.width="100%", fig.cap="Merged raster"}
+```{r, fig.cap="Merged raster"}
 plot(dem, reset = FALSE)
 plot(st_geometry(haifa), col = "red", pch = 16, add = TRUE)
 ```
 
-## Creating `Extent` objects
+## Cropping and masking rasters
 
-* The `crop` function can **crop** a raster given - 
-    * The input raster
-    * An `Extent` object
-* An `Extent` object specifies the coordinates of a **bounding box**
-* It can be **created** with the `extent` function - 
+**Cropping** a raster means deleting whole rows and/or columns, so that raster extent is reduced to a new (smaller) rectangular shape. **Masking** a raster means turning pixels outside of a given area (rectangular or not) into `NA`. The `[` operator can do both. 
+
+```{r, echo=FALSE, fig.cap="Cropping a raster^[http://rpubs.com/etiennebr/visualraster]", out.width="100%"}
+knitr::include_graphics("images/lesson_09_crop.svg")
+```
+
+For example, lets crop the `dem` raster according to an extent of $0.25\times0.25$ decimal degrees around Haifa:
 
 ```{r}
 st_bbox(haifa)
 ```
-
-* Adding a numeric value to an `Extent` object **increases** its size both vertically and horizontally, while keeping the **rectangular** shape
-* For example, adding `0.25` to a **"point" extent** creates an $0.25\times0.25$ extent centered around that point - 
 
 ```{r}
 haifa_ext = st_buffer(haifa, 0.25, endCapStyle = "SQUARE")
 haifa_ext
 ```
 
-* Plot - 
+Plot:
 
-```{r, fig.width=8, fig.height=5.4, out.width="100%", fig.cap="An $0.25\\times0.25$ degrees \\texttt{Extent} object"}
+```{r, fig.cap="An $0.25\\times0.25$ degrees rectangular extent"}
 plot(dem, reset = FALSE)
 plot(st_geometry(haifa_ext), border = "red", add = TRUE)
 ```
 
-## Cropping a raster with an `Extent` object
-
-* The `crop` function **cuts** out a **rectangular** subset of a raster based on an `Extent` - 
+The `[` operator can be used to crop the raster:
 
 ```{r}
 dem = dem[haifa_ext]
 ```
 
-* Plot - 
+Plot:
 
-```{r, fig.width=5.5, fig.height=6, out.width="62%", fig.cap="Cropped raster"}
+```{r, fig.cap="Cropped raster"}
 plot(dem)
 ```
 
-```{r, echo=FALSE, fig.cap="Cropping a raster", out.width="100%"}
-knitr::include_graphics("images/lesson_09_crop.svg")
-```
-
-http://rpubs.com/etiennebr/visualraster
-
 ## Raster resampling
 
-* Raster **resampling** is the process of transferring raster values from the original grid to a new grid
+Raster **resampling** is the process of transferring raster values from the original grid to a new grid. 
 
-```{r, echo=FALSE, fig.cap="Raster resampling", out.width="80%"}
+```{r, echo=FALSE, fig.cap="Raster resampling^[https://www.safe.com/transformers/raster-resampler/]", out.width="80%"}
 knitr::include_graphics("images/lesson_09_raster_resampling.png")
 ```
 
-https://www.safe.com/transformers/raster-resampler/
-
-* To demonstrate resampling, we will recreate the `ndvi`, `l_rec` and `r` rasters from **Lesson 06** - 
+To demonstrate resampling, we will recreate the `ndvi`, `l_rec` and `r` rasters from Chapter \@ref(raster-algebra):
 
 ```{r}
 l = read_stars("data/landsat_04_10_2000.tif")
@@ -150,7 +135,7 @@ l_rec[l_rec >= 0.2] = 1
 r = read_stars("data/modis_south.tif")
 ```
 
-* In the next example we **resample** the `r` raster values into the `ndvi` grid - 
+In the next example we resample the `r` raster values into the `ndvi` grid - 
 
 ```{r}
 plot(r[, , , 15], reset = FALSE)
@@ -158,30 +143,21 @@ plot(ndvi, add = TRUE, reset = FALSE)
 plot(st_as_sfc(st_bbox(ndvi)), add = TRUE, border = "red")
 ```
 
-* The `resample` function accepts three arguments - 
-    * `x` - The raster we are **resampling**
-    * `y` - The raster which defines the **new grid**
-    * `method` - The resampling **method**, can be -
-        * `"ngb"` - Nearest neighbor 
-        * `"bilinear"` - Bilinear, i.e. weighted average of nearest 4 pixels (the default)
+We use `st_warp`... Which supports the following resampling methods: ...
 
 ```{r}
 r_resample_ngb = st_warp(r[, , , 15], ndvi, use_gdal = TRUE)
 r_resample_bil = st_warp(r[, , , 15], ndvi, use_gdal = TRUE, method = "bilinear")
 ```
 
-* We will **stack** the two layers -
+We will combine the two layers for the purpose of plotting them:
 
 ```{r}
-resample_results = c(
-  r_resample_ngb, 
-  r_resample_bil,
-  along = 3
-)
+resample_results = c(r_resample_ngb, r_resample_bil, along = 3)
 # names(resample_results) = c("Nearest", "Bilinear")
 ```
 
-* Plot:
+Plot:
 
 ```{r}
 plot(resample_results)
@@ -189,17 +165,7 @@ plot(resample_results)
 
 ## Raster reprojection
 
-* Raster **reprojection** is conceptually related to resampling; the difference in that in reprojection we resample into a grid which is in a **different CRS**
-* The `projectRaster` function does raster reprojection -
-    * `from` - The raster we want to **reproject**
-    * `crs` - The **destination CRS**
-    * `method` - The resampling **method**, can be either `"ngb"` or `"bilinear"`
-    * `res` - The new grid **resolution** (optional)
-* Another option is to specify - 
-    * `from` - The raster we want to **reproject**
-    * `to` - The raster which defines the **destination grid**
-
-* For example - 
+Raster **reprojection** is conceptually related to resampling; the difference in that in reprojection we resample into a grid which is in a different CRS. The `st_warp` function is used for reprojection too. For example:
 
 ```{r, include=FALSE}
 dem_old = dem
@@ -209,70 +175,52 @@ dem_old = dem
 dem = st_warp(src = dem, crs = 32636, method = "near", cellsize = 90)
 ```
 
-* Plot - 
+Plot:
 
-```{r, echo=FALSE, fig.width=8.18, fig.height=5, out.width="100%", fig.cap="Reprojection result"}
+```{r, fig.cap="Reprojection result"}
 plot(dem_old)
 plot(dem)
 ```
 
 ## Calculations based on neighboring cells
 
-* Calculations based on **neighboring cells** include - 
-    * **"Moving window"** calculations - Transformation of raster values using the values from a neighborhood surrounding each pixel (e.g. focal filter, topographic indices)
+Calculations based on **neighboring cells** include: 
 
-```{r, echo=FALSE, fig.cap="Focal filter", out.width="70%"}
+* **"Moving window"** calculations - Transformation of raster values using the values from a neighborhood surrounding each pixel (e.g. focal filter, topographic indices)
+* **Segmentation** - Assignment of connected pixels with same (or similar) values into unique segments
+
+```{r, echo=FALSE, fig.cap="Focal filter^[http://courses.washington.edu/gis250/lessons/raster_analysis1/index.html]", out.width="70%"}
 knitr::include_graphics("images/lesson_09_focal_example.png")
 ```
 
-http://courses.washington.edu/gis250/lessons/raster_analysis1/index.html
-
-* Calculations based on **neighboring cells** include - 
-    * **Segmentation** - Assignment of connected pixels with same (or similar) values into unique segments
-
-```{r, echo=FALSE, fig.cap="Segmentation", out.width="70%"}
+```{r, echo=FALSE, fig.cap="Segmentation^[https://grass.osgeo.org/grass74/manuals/i.segment.html]", out.width="70%"}
 knitr::include_graphics("images/lesson_09_segmentation_example.jpg")
 ```
 
-https://grass.osgeo.org/grass74/manuals/i.segment.html
-
 ## Focal filters
 
-```{r, echo=FALSE, fig.cap="Focal filtering", out.width="90%"}
+There are various types of filters for different needs, such as:
+
+* **Low Pass** filter - Smoothing, reducing noise, through averaging
+* **High Pass** filter - Expresses the deviation of the central cell value from the local average
+
+```{r, echo=FALSE, fig.cap="Example of filters (Low pass and High pass)^[http://desktop.arcgis.com/en/arcmap/10.3/tools/spatial-analyst-toolbox/how-filter-works.htm]", out.width="50%"}
+knitr::include_graphics(c("images/lesson_09_filter_low_pass.png", "images/lesson_09_filter_high_pass.png"))
+```
+
+```{r, echo=FALSE, fig.cap="Focal filtering^[http://rpubs.com/etiennebr/visualraster]", out.width="90%"}
 knitr::include_graphics("images/lesson_09_focal.svg")
 ```
 
-http://rpubs.com/etiennebr/visualraster
+## Low pass filter
 
-* The `focal` function applies a **focal filter** ("moving window"), given - 
-    * `x` - The input **raster**
-    * `w` - A `matrix` which defines the **neighborhood size** and the **weights**
-    * `fun` - The applied **function** (default is `sum`)
-* The `w` matrix needs to have an **odd** number of rows and columns (such as $3\times3$, $7\times5$, etc.) because its **central cell** defines the focal window center
-* The `w` matrix values determine the **weights**; raster values within the window are first **multiplied** by the weights in `w`, then **passed** to the function `fun`
-
-* For example, the following **matrix** defines a $3\times3$ window with weights of `1` (therefore, essentially no weighting)
-* The central cell `[2,2]` is the focal window center
+We are going to create out own function for low-pass focal filtering...
 
 ```{r}
 matrix(1, nrow = 3, ncol = 3)
 ```
 
-* Question: how can we define a non-symmetric neighborhood, such as $2\times2$, even though matrix `w` can't have an even number of rows and columns?
-
-* There are various types of filters for different needs, such as -
-    * **Low Pass** filter - Smoothing, reducing noise, through averaging
-    * **High Pass** filter - Expresses the deviation of the central cell value from the local average
-
-```{r, echo=FALSE, fig.cap="Example of filters (Low pass and High pass)", out.width="50%"}
-knitr::include_graphics(c("images/lesson_09_filter_low_pass.png", "images/lesson_09_filter_high_pass.png"))
-```
-
-http://desktop.arcgis.com/en/arcmap/10.3/tools/spatial-analyst-toolbox/how-filter-works.htm
-
 * For example, the following expression applies a **Low Pass** filter with a focal window of $3\times3$ -
-
-## Low pass filter
 
 ```{r}
 get_neighbors = function(m, pos) {
@@ -313,16 +261,17 @@ r_lowpass = focal2(r[, , , 1, drop = TRUE], mean)
 plot(r_lowpass)
 ```
 
-* Given a raster with `0` and `1` values (such as `l_rec`), we may want to convert all `0` cells neighboring to a `1` cell to become `1`
-* This can be achieved with a **focal filter** and `max` - 
+## Maximum filter
+
+Given a raster with `0` and `1` values (such as `l_rec`), we may want to convert all `0` cells neighboring to a `1` cell to become `1`. This can be achieved with a **focal filter** and `max`:
 
 ```{r}
 l_rec_focal = focal2(l_rec, max)
 ```
 
-* Plot - 
+Plot:
 
-```{r, echo=FALSE, fig.cap='"Buffering" `1` values in a raster', fig.width=9.4, fig.height=5, out.width="100%"}
+```{r, fig.cap='"Buffering" `1` values in a raster'}
 plot(l_rec_focal)
 ```
 
@@ -330,58 +279,44 @@ Note that our custom focal filter function is quite minimal, and can be improved
 
 * Dealing with `NA` values
 * Dealing with the first/last rows and and columns
-
-* When we apply a **Low Pass** filter more than once, consecutively, we get a higher degree of smoothing
-* For example, the following code applies a $7\times7$ Low Pass filter on `l_rec` **10 times** - 
+* Making the calculation more efficient (e.g. in C/C++)
 
 ```{r}
-# l_rec_lp = l_rec
-# for(i in 1:10) {
-#   l_rec_lp = raster_focal(
-#     x = l_rec_lp,
-#     w = matrix(1, nrow = 7, ncol = 7),
-#     fun = mean
-#   )
-# }
+l_rec_lp = l_rec
+for(i in 1:10) {
+  l_rec_lp = focal2(l_rec_lp, mean)
+}
 ```
 
-* Plot - 
+Plot:
 
 ```{r, echo=FALSE, fig.width=9.4, fig.height=5, out.width="100%", fig.cap="Low Pass filter applied 10 times"}
-# plot(l_rec)
-# plot(l_rec_lp)
+plot(l_rec_lp)
 ```
 
-* Question 1: why does the outer boundary now has `NA`s?
-* Question 2: why does the values range no longer includes `1`?
-
+> Why does the outer boundary now has `NA`s? Why does the values range no longer includes `1`?
 
 ## Segmentation
 
-```{r, echo=FALSE, fig.cap="Segmentation with the `clump` function", out.width="100%"}
+```{r, echo=FALSE, fig.cap="Segmentation^[http://rpubs.com/etiennebr/visualraster]", out.width="100%"}
 knitr::include_graphics("images/lesson_09_clump.svg")
 ```
 
-http://rpubs.com/etiennebr/visualraster
+**Segmentation**, in its simplest form, aims to detect segments of connected pixels with any value other than `0` or `NA`, returning a raster where each segment has a unique ID. 
+Cells with `0` or `NA` are treated as background, they are not part of any segment. 
 
-* The `clump` function detects **segments** of **connected** pixels with **any value** other than `0` or `NA`, returning a raster where each segment has a **unique ID**
-* Cells with `0` or `NA` are treated as **background**, they are not part of any segment
-* Using `gaps=FALSE` "forces" the segment IDs to be **consecutive** integers `1`, `2`, ..., `n` (where `n` is the number of segments)
-* Note: the `igraph` package needs to be installed for the `clump` function to work
-
-* For example - 
+For example:
 
 ```{r}
 pol = st_as_sf(l_rec_focal, merge = TRUE)
 pol = pol[pol$NDVI == 1, ]
 ```
 
-* Question 1: What is the exact number of segments in `l_rec_focal_clump`?
-* Question 2: If we ran the `clump` function on `l_rec` instead of `l_rec_focal`, do you think the number of segments would be higher or lower?
+> What is the exact number of segments in `l_rec_focal_clump`? If we ran the `clump` function on `l_rec` instead of `l_rec_focal`, do you think the number of segments would be higher or lower?
 
-* Plot - 
+Plot:
 
-```{r, fig.width=6.5, fig.height=7.3, out.width="62%", fig.cap="Segments detected with `raster_clump`"}
+```{r, fig.cap="Segments with NDVI>0.2"}
 plot(pol)
 ```
 
